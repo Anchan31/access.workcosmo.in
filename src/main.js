@@ -3,7 +3,7 @@ import { PERMISSIONS, ROLE_DEFINITIONS } from "./config/rbac.js";
 import { canAccessModule, canAddUser, getBlockedReason, hasFeature, hasPermission } from "./services/accessControlService.js";
 import { watchAuth, login, logout, loadAccessSession } from "./services/authService.js";
 import { createCompanyWorkspace, getCompanyUsers, inviteUser, assignRole } from "./services/companyService.js";
-import { createRecord, listCollection, getRecord, updateRecord } from "./services/firestoreService.js";
+import { createRecord, listCollection, getRecord, updateRecord, deleteRecord } from "./services/firestoreService.js";
 import { createSubscription, upgradePlan, scheduleDowngrade, cancelSubscription } from "./services/subscriptionService.js";
 import { logActivity } from "./services/activityLogService.js";
 import { escapeHtml, formatDate, formatDateTime, inr, initials, percent } from "./utils/format.js";
@@ -759,6 +759,10 @@ function bindViewEvents() {
     document.querySelectorAll("[data-sub-action]").forEach((button) => {
         button.addEventListener("click", () => handleSubscriptionAction(button));
     });
+
+    document.querySelectorAll("[data-record-action]").forEach((button) => {
+        button.addEventListener("click", () => handleRecordAction(button));
+    });
 }
 
 function slugify(text) {
@@ -985,6 +989,91 @@ async function handleSubscriptionAction(button) {
     toast(`Subscription ${action} saved.`);
 }
 
+async function handleRecordAction(button) {
+    const action = button.dataset.recordAction;
+    const collectionName = button.dataset.collection;
+    const id = button.dataset.recordId;
+    const record = findRecord(collectionName, id);
+
+    if (!record) {
+        toast("Record not found.", true);
+        return;
+    }
+
+    if (action === "view") {
+        alert(`${collectionName}/${id}\n\n${JSON.stringify(record, null, 2)}`);
+        return;
+    }
+
+    if (action === "edit") {
+        const editableRecord = { ...record };
+        delete editableRecord.id;
+        delete editableRecord.createdAt;
+        delete editableRecord.updatedAt;
+
+        const input = prompt(
+            `Edit ${collectionName}/${id}\nUpdate the JSON fields below, then press OK.`,
+            JSON.stringify(editableRecord, null, 2)
+        );
+        if (!input) return;
+
+        try {
+            const payload = JSON.parse(input);
+            await updateRecord(collectionName, id, payload);
+            await logRecordAction(collectionName, id, "updated");
+            await loadData();
+            renderShell();
+            toast("Record updated.");
+        } catch (error) {
+            toast(`Edit failed: ${error.message}`, true);
+        }
+        return;
+    }
+
+    if (action === "delete") {
+        const confirmed = confirm(`Delete ${collectionName}/${id}? This cannot be undone.`);
+        if (!confirmed) return;
+
+        try {
+            await deleteRecord(collectionName, id);
+            await logRecordAction(collectionName, id, "deleted");
+            await loadData();
+            renderShell();
+            toast("Record deleted.");
+        } catch (error) {
+            toast(`Delete failed: ${error.message}`, true);
+        }
+    }
+}
+
+async function logRecordAction(collectionName, id, action) {
+    try {
+        await logActivity({
+            companyId: state.session.company?.id || "platform",
+            actorId: state.session.user?.id || "system",
+            action: `${collectionName}.${action}`,
+            entityType: collectionName,
+            entityId: id
+        });
+    } catch (error) {
+        console.warn("Activity log skipped:", error);
+    }
+}
+
+function findRecord(collectionName, id) {
+    const collections = {
+        subscriptions: state.subscriptions,
+        companies: state.companies,
+        users: state.users,
+        roles: state.roles,
+        permissions: state.permissions,
+        activityLogs: state.logs,
+        accessPasses: state.accessPasses,
+        purchaseRequests: state.purchaseRequests
+    };
+    return collections[collectionName]?.find((item) => item.id === id);
+}
+
 function purchaseRequestTable(requests, compact = false) {
     if (!requests.length) return empty("No purchase requests in this queue.");
     return `
@@ -1044,6 +1133,7 @@ function companyTable(companies) {
                         <th class="px-6 py-4">Plan</th>
                         <th class="px-6 py-4">Status</th>
                         <th class="px-6 py-4">Users</th>
+                        <th class="px-6 py-4">Actions</th>
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-white/5">
@@ -1066,6 +1156,7 @@ function companyTable(companies) {
                                         <div class="h-full bg-gradient-to-r from-blue-500 to-indigo-500" style="width: ${percent(used, company.maxUsers)}%"></div>
                                     </div>
                                 </td>
+                                <td class="px-6 py-4">${recordActions("companies", company.id)}</td>
                             </tr>
                         `;
     }).join("")}
@@ -1086,6 +1177,7 @@ function userTable(users) {
                         <th class="px-6 py-4">Company</th>
                         <th class="px-6 py-4">Role</th>
                         <th class="px-6 py-4">Status</th>
+                        <th class="px-6 py-4">Actions</th>
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-white/5">
@@ -1098,6 +1190,7 @@ function userTable(users) {
                             <td class="px-6 py-4 text-xs font-medium text-slate-400">${escapeHtml(companyName(user.companyId))}</td>
                             <td class="px-6 py-4">${badge(ROLE_DEFINITIONS[user.role]?.label || user.role, "info")}</td>
                             <td class="px-6 py-4">${badge(user.status || "active", statusTone(user.status))}</td>
+                            <td class="px-6 py-4">${recordActions("users", user.id)}</td>
                         </tr>
                     `).join("")}
                 </tbody>
@@ -1136,9 +1229,11 @@ function subscriptionTable(subscriptions) {
                             </td>
                             <td class="px-6 py-4">
                                 <div class="flex gap-2">
+                                    ${recordActionButton("view", "subscriptions", sub.id, "fa-eye", "View")}
+                                    ${recordActionButton("edit", "subscriptions", sub.id, "fa-pen", "Edit")}
                                     <button class="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center hover:bg-blue-500/20 hover:text-blue-400 transition-all" data-sub-action="upgrade" data-plan="enterprise" data-sub-id="${sub.id}" title="Upgrade"><i class="fas fa-arrow-up text-xs"></i></button>
                                     <button class="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center hover:bg-amber-500/20 hover:text-amber-400 transition-all" data-sub-action="suspend" data-sub-id="${sub.id}" title="Suspend"><i class="fas fa-ban text-xs"></i></button>
-                                    <button class="w-8 h-8 rounded-lg bg-red-500/10 text-red-500 flex items-center justify-center hover:bg-red-500/20 transition-all" data-sub-action="cancel" data-sub-id="${sub.id}" title="Cancel"><i class="fas fa-trash text-xs"></i></button>
+                                    ${recordActionButton("delete", "subscriptions", sub.id, "fa-trash", "Delete", true)}
                                 </div>
                             </td>
                         </tr>
@@ -1146,6 +1241,31 @@ function subscriptionTable(subscriptions) {
                 </tbody>
             </table>
         </div>
+    `;
+}
+
+function recordActions(collectionName, id) {
+    return `
+        <div class="flex gap-2">
+            ${recordActionButton("view", collectionName, id, "fa-eye", "View")}
+            ${recordActionButton("edit", collectionName, id, "fa-pen", "Edit")}
+            ${recordActionButton("delete", collectionName, id, "fa-trash", "Delete", true)}
+        </div>
+    `;
+}
+
+function recordActionButton(action, collectionName, id, icon, title, danger = false) {
+    const style = danger
+        ? "bg-red-500/10 text-red-500 hover:bg-red-500/20"
+        : "bg-white/5 hover:bg-blue-500/20 hover:text-blue-400";
+    return `
+        <button class="w-8 h-8 rounded-lg ${style} flex items-center justify-center transition-all"
+            data-record-action="${action}"
+            data-collection="${collectionName}"
+            data-record-id="${escapeHtml(id)}"
+            title="${title}">
+            <i class="fas ${icon} text-xs"></i>
+        </button>
     `;
 }
 

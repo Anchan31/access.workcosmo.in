@@ -9,6 +9,7 @@ import {
     query,
     runTransaction,
     serverTimestamp,
+    deleteDoc,
     updateDoc,
     setDoc,
     where,
@@ -73,6 +74,10 @@ export async function updateRecord(path, id, payload) {
         ...payload,
         updatedAt: serverTimestamp()
     });
+}
+
+export async function deleteRecord(path, id) {
+    await deleteDoc(doc(db, path, id));
 }
 
 export async function atomicCreateCompany({ company, owner, subscriptionId }) {
