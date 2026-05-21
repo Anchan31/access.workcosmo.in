@@ -3,11 +3,13 @@ import { PERMISSIONS, ROLE_DEFINITIONS } from "./config/rbac.js";
 import { canAccessModule, canAddUser, getBlockedReason, hasFeature, hasPermission } from "./services/accessControlService.js";
 import { watchAuth, login, logout, loadAccessSession } from "./services/authService.js";
 import { createCompanyWorkspace, getCompanyUsers, inviteUser, assignRole } from "./services/companyService.js";
-import { listCollection, getRecord, updateRecord } from "./services/firestoreService.js";
+import { createRecord, listCollection, getRecord, updateRecord } from "./services/firestoreService.js";
 import { createSubscription, upgradePlan, scheduleDowngrade, cancelSubscription } from "./services/subscriptionService.js";
 import { logActivity } from "./services/activityLogService.js";
 import { escapeHtml, formatDate, formatDateTime, inr, initials, percent } from "./utils/format.js";
 import { toast } from "./utils/toast.js";
+import { secondaryAuth } from "./services/firebase.js";
+import { createUserWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
 
 const app = document.getElementById("app");
 
@@ -16,7 +18,13 @@ const views = {
         icon: "fa-gauge-high",
         label: "Overview",
         title: "Owner Control Center",
-        subtitle: "Create subscriptions, companies, login users, roles, and RMS access from one private admin panel."
+        subtitle: "Review paid purchase requests, confirm payment, and manually provision customer access."
+    },
+    requests: {
+        icon: "fa-inbox",
+        label: "Purchase Requests",
+        title: "Payment Requests",
+        subtitle: "Confirm paid Razorpay subscriptions, then create the subscription, company, owner user, and access pass."
     },
     companies: {
         icon: "fa-building-shield",
@@ -60,6 +68,8 @@ let state = {
     view: "overview",
     session: null,
     subscriptions: [],
+    purchaseRequests: [],
+    accessPasses: [],
     companies: [],
     users: [],
     roles: [],
@@ -84,8 +94,9 @@ document.addEventListener("DOMContentLoaded", () => {
 });
 
 async function loadData() {
-    const [subscriptions, companies, users, roles, permissions, logs] = await Promise.all([
+    const [subscriptions, accessPasses, companies, users, roles, permissions, logs] = await Promise.all([
         safeList("subscriptions"),
+        safeList("accessPasses"),
         safeList("companies"),
         safeList("users"),
         safeList("roles"),
@@ -93,9 +104,35 @@ async function loadData() {
         safeList("activityLogs")
     ]);
 
+    // Map unprovisioned subscriptions to state.purchaseRequests so we don't have to rewrite the HTML rendering code or views!
+    const purchaseRequests = subscriptions.filter(sub => !sub.companyId).map(sub => {
+        let mappedPlan = "starter";
+        if (sub.plan_id === "plan_SoAKfnYYCTZHDo") mappedPlan = "professional";
+        if (sub.plan_id === "plan_SouJvWzj8xFSgg") mappedPlan = "enterprise";
+        if (sub.plan) mappedPlan = sub.plan; // fallback if already standard
+
+        return {
+            id: sub.id,
+            buyerName: sub.name || "Unknown Buyer",
+            buyerEmail: sub.email || "no-email@test.com",
+            companyName: sub.company || `${sub.name || "Customer"} Workspace`,
+            mobile: sub.mobile || "",
+            plan: mappedPlan,
+            planName: sub.plan_name || planName(mappedPlan),
+            status: sub.status || "active",
+            provisioningStatus: sub.companyId ? "completed" : "pending",
+            createdAt: sub.created_at || new Date().toISOString(),
+            updatedAt: sub.created_at || new Date().toISOString(),
+            razorpaySubscriptionId: sub.subscription_id || sub.id,
+            razorpayPlanId: sub.plan_id || ""
+        };
+    });
+
     state = {
         ...state,
         subscriptions,
+        purchaseRequests,
+        accessPasses,
         companies,
         users,
         roles,
@@ -136,7 +173,7 @@ function renderShell() {
                     <div class="logo-mark"><i class="fas fa-shield-halved"></i></div>
                     <div>
                         <span class="brand-title">NextGen Udaan</span>
-                        <span class="brand-subtitle">Access Control</span>
+                        <span class="brand-subtitle">Control Center</span>
                     </div>
                 </div>
                 <nav class="nav">
@@ -148,22 +185,33 @@ function renderShell() {
                     `).join("")}
                 </nav>
                 <div class="tenant-card">
-                    <strong>${escapeHtml(state.session.company?.companyName || "Platform Admin")}</strong>
-                    <span>${state.session.adminMode ? "Private owner panel" : `${escapeHtml(state.session.user?.role || "No role")} - ${escapeHtml(state.session.subscription?.status || "No subscription")}`}</span>
-                    <button class="btn" id="logoutButton" type="button" style="margin-top:14px;width:100%">
-                        <i class="fas fa-arrow-right-from-bracket"></i> Logout
+                    <div class="flex items-center gap-3 mb-3">
+                        <div class="w-8 h-8 rounded-lg bg-blue-500/20 flex items-center justify-center text-blue-400">
+                            <i class="fas fa-user-shield"></i>
+                        </div>
+                        <div class="flex-1 overflow-hidden">
+                            <strong class="truncate">${escapeHtml(state.session.company?.companyName || "Platform Admin")}</strong>
+                            <span class="truncate">${state.session.adminMode ? "Super Admin" : escapeHtml(state.session.user?.role || "Admin")}</span>
+                        </div>
+                    </div>
+                    <button class="btn w-full !bg-red-500/10 !text-red-400 !border-red-500/20 hover:!bg-red-500/20 transition-all" id="logoutButton" type="button">
+                        <i class="fas fa-power-off"></i> Sign Out
                     </button>
                 </div>
             </aside>
             <main class="content">
-                <header class="topbar">
-                    <div>
-                        <h1>${current.title}</h1>
-                        <p class="muted">${current.subtitle}</p>
+                <header class="topbar glass-card">
+                    <div class="flex flex-col">
+                        <h1 class="text-2xl font-bold tracking-tight">${current.title}</h1>
+                        <p class="text-xs text-slate-500 font-medium">${current.subtitle}</p>
                     </div>
                     <div class="actions">
-                        <button class="btn" id="refreshButton" type="button"><i class="fas fa-rotate"></i> Refresh</button>
-                        <button class="btn btn-primary" id="primaryAction" type="button"><i class="fas fa-plus"></i> ${primaryActionLabel()}</button>
+                        <button class="btn hover-lift" id="refreshButton" type="button">
+                            <i class="fas fa-rotate"></i> Sync
+                        </button>
+                        <button class="btn btn-primary shimmer" id="primaryAction" type="button">
+                            <i class="fas fa-plus"></i> ${primaryActionLabel()}
+                        </button>
                     </div>
                 </header>
                 <section id="viewRoot" class="fade-in">${renderView()}</section>
@@ -193,7 +241,6 @@ function renderLogin(error = "") {
                 <input id="loginPassword" type="password" autocomplete="current-password" required>
             </div>
             <button class="btn btn-primary" type="submit"><i class="fas fa-lock"></i> Sign In</button>
-            <p class="muted">Add your UID to <code>/platformAdmins/{uid}</code> to unlock full control.</p>
         </form>
     `;
     document.getElementById("loginForm").addEventListener("submit", async (event) => {
@@ -232,6 +279,7 @@ function renderExpired() {
 
 function renderView() {
     switch (state.view) {
+        case "requests": return renderPurchaseRequests();
         case "companies": return renderCompanies();
         case "users": return renderUsers();
         case "roles": return renderRoles();
@@ -243,49 +291,104 @@ function renderView() {
 }
 
 function renderOverview() {
+    const paidRequests = state.purchaseRequests.filter((request) => request.status === "payment_received").length;
+    const pendingProvisioning = state.purchaseRequests.filter((request) => request.provisioningStatus !== "completed").length;
     const activeSubscriptions = state.subscriptions.filter((sub) => ["active", "trialing", "grace"].includes(sub.status)).length;
     const activeCompanies = state.companies.filter((company) => company.status === "active").length;
-    const activeUsers = state.users.filter((user) => user.status === "active").length;
-    const suspended = state.companies.filter((company) => company.status === "suspended").length;
+
+    return `
+        <div class="space-y-8 animate-fade-in">
+            <!-- Hero Stats -->
+            <section class="grid metrics !grid-cols-1 md:!grid-cols-2 lg:!grid-cols-4 gap-6">
+                ${metric("Paid Requests", paidRequests, "fa-receipt", "blue")}
+                ${metric("Pending Setup", pendingProvisioning, "fa-hourglass-half", "amber")}
+                ${metric("Active Subs", activeSubscriptions, "fa-credit-card", "indigo")}
+                ${metric("Companies", activeCompanies, "fa-building", "emerald")}
+            </section>
+
+            <div class="grid two gap-8">
+                <div class="space-y-8">
+                    <!-- Provisioning Queue -->
+                    <div class="panel glass-card overflow-hidden">
+                        <div class="p-6 border-b border-white/5 flex justify-between items-center bg-white/5">
+                            <div>
+                                <h3 class="text-lg font-bold">Provisioning Queue</h3>
+                                <p class="text-xs text-slate-500">Awaiting owner activation</p>
+                            </div>
+                            ${badge(pendingProvisioning + " Pending", "warning")}
+                        </div>
+                        <div class="p-0">
+                            ${purchaseRequestTable(state.purchaseRequests.slice(0, 6), true)}
+                        </div>
+                    </div>
+
+                    <!-- Usage Stats -->
+                    <div class="panel glass-card">
+                        <div class="p-6 border-b border-white/5">
+                            <h3 class="text-lg font-bold">Plan Usage</h3>
+                            <p class="text-xs text-slate-500">Tenant resource consumption</p>
+                        </div>
+                        <div class="p-6">
+                            ${companyUsageList()}
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Recent Activity -->
+                <div class="panel glass-card">
+                    <div class="p-6 border-b border-white/5 flex justify-between items-center">
+                        <div>
+                            <h3 class="text-lg font-bold">Audit Log</h3>
+                            <p class="text-xs text-slate-500">Real-time system events</p>
+                        </div>
+                        <i class="fas fa-history text-slate-600"></i>
+                    </div>
+                    <div class="p-0">
+                        ${activityTable(state.logs.slice(0, 10))}
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+}
+
+function renderPurchaseRequests() {
+    const openRequests = state.purchaseRequests.filter((request) => request.provisioningStatus !== "completed");
+    const completedRequests = state.purchaseRequests.filter((request) => request.provisioningStatus === "completed");
 
     return `
         <div class="grid">
             <section class="hero">
                 <div>
-                    <p class="eyebrow">Multi-tenant SaaS access</p>
-                    <h2>Your private provisioning desk for Recruitment Management customers.</h2>
-                    <p class="muted">Customers contact you. You create their subscription, company, users, and roles, then send only their RMS portal link, email, and password.</p>
+                    <p class="eyebrow">Manual confirmation workflow</p>
+                    <h2>Confirm payment, then provision access.</h2>
+                    <p class="muted">Use this queue after a buyer completes Razorpay checkout. The button creates the subscription, company, owner user profile, and access pass in Firestore.</p>
                 </div>
                 <div class="domain-strip">
-                    ${domainItem("nextgenudaan.in", "Public information and contact")}
-                    ${domainItem("access.nextgenudaan.in", "Private owner-only control panel")}
-                    ${domainItem("app.nextgenudaan.in", "Customer RMS login")}
+                    ${domainItem("1. Buyer login", "Firebase Auth account from public checkout")}
+                    ${domainItem("2. Razorpay", "Subscription created and linked to a purchase request")}
+                    ${domainItem("3. Owner review", "You confirm payment in this portal")}
+                    ${domainItem("4. Access pass", "SaaS login details are created after provisioning")}
                 </div>
-            </section>
-            <section class="grid metrics">
-                ${metric("Subscriptions", activeSubscriptions, "fa-credit-card")}
-                ${metric("Companies", activeCompanies, "fa-building")}
-                ${metric("Active Users", activeUsers, "fa-users")}
-                ${metric("Suspended", suspended, "fa-ban")}
             </section>
             <section class="grid two">
                 <div class="panel">
                     <div class="table-head">
                         <div>
-                            <h3>Plan Usage</h3>
-                            <p class="muted">Active users compared with plan maximum.</p>
+                            <h3>Needs Owner Action</h3>
+                            <p class="muted">${openRequests.length} request${openRequests.length === 1 ? "" : "s"} waiting for review.</p>
                         </div>
                     </div>
-                    ${companyUsageList()}
+                    ${purchaseRequestTable(openRequests)}
                 </div>
                 <div class="panel">
                     <div class="table-head">
                         <div>
-                            <h3>Recent Activity</h3>
-                            <p class="muted">Audit-ready access and billing events.</p>
+                            <h3>Provisioned</h3>
+                            <p class="muted">${completedRequests.length} completed customer setup${completedRequests.length === 1 ? "" : "s"}.</p>
                         </div>
                     </div>
-                    ${activityTable(state.logs.slice(0, 8))}
+                    ${purchaseRequestTable(completedRequests, true)}
                 </div>
             </section>
         </div>
@@ -388,41 +491,107 @@ function renderUsers() {
 }
 
 function renderRoles() {
+    const roles = Object.values(ROLE_DEFINITIONS);
+    const permissions = Object.values(PERMISSIONS);
+
     return `
-        <div class="grid">
-            <section class="grid three">
-                ${Object.values(ROLE_DEFINITIONS).map((role) => `
-                    <div class="panel">
-                        <h3>${role.label}</h3>
-                        <p class="muted">${role.permissions.length} permissions</p>
-                        <div>${role.permissions.map((permission) => badge(permission, "soft")).join("")}</div>
-                    </div>
-                `).join("")}
-            </section>
-            <section class="panel">
-                <div class="table-head">
+        <div class="space-y-8 animate-fade-in">
+            <!-- RBAC Matrix -->
+            <div class="panel glass-card overflow-hidden">
+                <div class="p-6 border-b border-white/5 flex justify-between items-center bg-white/5">
                     <div>
-                        <h3>Role Assignment</h3>
-                        <p class="muted">Change a user's role without touching tenant isolation.</p>
+                        <h3 class="text-lg font-bold">Permission Matrix</h3>
+                        <p class="text-xs text-slate-500">Cross-role capability mapping for the Nextgen Ecosystem</p>
+                    </div>
+                    <div class="flex gap-2">
+                        ${roles.map(r => badge(r.label, "soft")).join("")}
                     </div>
                 </div>
-                <form id="roleForm" class="form" style="max-width:520px">
-                    <div class="field">
-                        <label for="roleUser">User</label>
-                        <select id="roleUser" required>
-                            <option value="">Select user</option>
-                            ${state.users.map((user) => `<option value="${user.id}">${escapeHtml(user.name)} - ${escapeHtml(user.email)}</option>`).join("")}
-                        </select>
+                <div class="table-wrap overflow-x-auto">
+                    <table class="w-full text-left">
+                        <thead>
+                            <tr class="border-b border-white/5 text-[10px] font-black uppercase tracking-widest text-slate-500">
+                                <th class="px-6 py-4">Permission Scope</th>
+                                ${roles.map(role => `<th class="px-6 py-4 text-center">${role.label}</th>`).join("")}
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-white/5">
+                            ${permissions.map(perm => `
+                                <tr class="hover:bg-white/5 transition-colors">
+                                    <td class="px-6 py-4">
+                                        <div class="font-bold text-slate-200">${perm.replace(/_/g, ' ')}</div>
+                                        <div class="text-[10px] text-slate-500 font-medium uppercase">Capability</div>
+                                    </td>
+                                    ${roles.map(role => {
+                                        const has = role.permissions.includes(perm) || role.permissions.includes("full_access");
+                                        return `
+                                            <td class="px-6 py-4 text-center">
+                                                <div class="flex justify-center">
+                                                    <div class="w-6 h-6 rounded-md flex items-center justify-center ${has ? "bg-emerald-500/20 text-emerald-400" : "bg-white/5 text-slate-600"}">
+                                                        <i class="fas ${has ? "fa-check" : "fa-minus text-[10px]"}"></i>
+                                                    </div>
+                                                </div>
+                                            </td>
+                                        `;
+                                    }).join("")}
+                                </tr>
+                            `).join("")}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="grid two gap-8">
+                <!-- Role Assignment -->
+                <div class="panel glass-card">
+                    <div class="p-6 border-b border-white/5">
+                        <h3 class="text-lg font-bold">Assign Member Role</h3>
+                        <p class="text-xs text-slate-500">Update permissions for a specific user profile</p>
                     </div>
-                    <div class="field">
-                        <label for="roleValue">Role</label>
-                        <select id="roleValue" required>
-                            ${Object.values(ROLE_DEFINITIONS).map((role) => `<option value="${role.id}">${role.label}</option>`).join("")}
-                        </select>
+                    <div class="p-6">
+                        <form id="roleForm" class="space-y-6">
+                            <div class="space-y-2">
+                                <label class="text-xs font-bold text-slate-500 uppercase tracking-widest">Select User</label>
+                                <select id="roleUser" class="theme-input" required>
+                                    <option value="">Select a member...</option>
+                                    ${state.users.map((user) => `<option value="${user.id}">${escapeHtml(user.name)} (${escapeHtml(user.email)})</option>`).join("")}
+                                </select>
+                            </div>
+                            <div class="space-y-2">
+                                <label class="text-xs font-bold text-slate-500 uppercase tracking-widest">Target Role</label>
+                                <div class="grid grid-cols-2 gap-3">
+                                    ${roles.map(role => `
+                                        <label class="relative flex flex-col p-4 rounded-xl border border-white/5 bg-white/5 cursor-pointer hover:bg-white/10 transition-all">
+                                            <input type="radio" name="roleValue" value="${role.id}" class="sr-only" required>
+                                            <span class="text-sm font-bold text-slate-200">${role.label}</span>
+                                            <span class="text-[10px] text-slate-500 font-medium">${role.permissions.length} perms</span>
+                                        </label>
+                                    `).join("")}
+                                </div>
+                            </div>
+                            <button class="btn btn-primary w-full shimmer" type="submit">
+                                <i class="fas fa-user-shield mr-2"></i> Update Permissions
+                            </button>
+                        </form>
                     </div>
-                    <button class="btn btn-primary" type="submit"><i class="fas fa-user-check"></i> Assign Role</button>
-                </form>
-            </section>
+                </div>
+
+                <!-- Role Summary -->
+                <div class="panel glass-card p-8 flex flex-col justify-center items-center text-center space-y-4">
+                    <div class="w-16 h-16 rounded-2xl bg-blue-500/20 flex items-center justify-center text-blue-400 text-2xl">
+                        <i class="fas fa-fingerprint"></i>
+                    </div>
+                    <div>
+                        <h3 class="text-xl font-bold">Unified Identity</h3>
+                        <p class="text-sm text-slate-500 max-w-[280px]">Nextgen RBAC ensures that a user's role in the Access Portal is instantly recognized across all ecosystem applications.</p>
+                    </div>
+                    <div class="domain-strip w-full">
+                        ${domainItem("Isolation", "Tenant-level")}
+                        ${domainItem("Sync", "Real-time")}
+                        ${domainItem("Engine", "Firestore-Native")}
+                    </div>
+                </div>
+            </div>
         </div>
     `;
 }
@@ -515,16 +684,16 @@ function renderArchitecture() {
             <section class="hero">
                 <div>
                     <p class="eyebrow">Login access flow</p>
-                    <h2>Owner admin first, customer app login second.</h2>
-                    <p class="muted">You use this panel to control every tenant. Customers only use <code>app.nextgenudaan.in</code>; inactive subscriptions render a contact-admin page in the RMS app.</p>
+                    <h2>Payment request first, owner activation second.</h2>
+                    <p class="muted">Buyers pay on the public site. You confirm payment here, then customers use <code>app.nextgenudaan.in</code> after their access pass is active.</p>
                 </div>
                 <div class="domain-strip">
                     ${domainItem("1. Firebase Auth", "Verify signed-in user")}
                     ${domainItem("2. /platformAdmins/{uid}", "Your private owner access to all tenants")}
-                    ${domainItem("3. /users/{uid}", "Customer app login profile")}
-                    ${domainItem("4. /companies/{companyId}", "Tenant status and plan")}
-                    ${domainItem("5. /subscriptions/{id}", "Status, expiry, grace, suspension")}
-                    ${domainItem("6. Helper gates", "hasPermission + hasFeature")}
+                    ${domainItem("3. /purchaseRequests/{id}", "Paid buyer request awaiting owner confirmation")}
+                    ${domainItem("4. /users/{uid}", "Customer app login profile")}
+                    ${domainItem("5. /companies/{companyId}", "Tenant status and plan")}
+                    ${domainItem("6. /subscriptions/{id}", "Status, expiry, grace, suspension")}
                 </div>
             </section>
             <section class="grid two">
@@ -532,6 +701,8 @@ function renderArchitecture() {
                     <h3>Firestore Collections</h3>
                     <div class="domain-strip">
                         ${domainItem("/platformAdmins/{uid}", "owner-only admin access for this panel")}
+                        ${domainItem("/purchaseRequests/{id}", "buyer, company, Razorpay ids, payment and provisioning status")}
+                        ${domainItem("/accessPasses/{id}", "final company, plan, modules, owner, and app login handoff")}
                         ${domainItem("/companies/{companyId}", "companyName, ownerId, subscriptionId, plan, maxUsers, status, features")}
                         ${domainItem("/users/{userId}", "companyId, name, email, role, status, inviteStatus")}
                         ${domainItem("/subscriptions/{subscriptionId}", "plan, maxUsers, status, dates, Razorpay ids, custom limits")}
@@ -581,9 +752,118 @@ function bindViewEvents() {
     document.getElementById("userForm")?.addEventListener("submit", handleInviteUser);
     document.getElementById("roleForm")?.addEventListener("submit", handleAssignRole);
 
+    document.querySelectorAll("[data-provision-request]").forEach((button) => {
+        button.addEventListener("click", () => handleProvisionRequest(button.dataset.provisionRequest));
+    });
+
     document.querySelectorAll("[data-sub-action]").forEach((button) => {
         button.addEventListener("click", () => handleSubscriptionAction(button));
     });
+}
+
+function slugify(text) {
+    return text.toString().toLowerCase().trim()
+        .replace(/\s+/g, '-')           // Replace spaces with -
+        .replace(/[^\w\-]+/g, '')       // Remove all non-word chars
+        .replace(/\-\-+/g, '-')         // Replace multiple - with single -
+        .replace(/^-+/, '')             // Trim - from start
+        .replace(/-+$/, '');            // Trim - from end
+}
+
+async function handleProvisionRequest(requestId) {
+    const request = state.purchaseRequests.find((item) => item.id === requestId);
+    if (!request) {
+        toast("Purchase request not found.", true);
+        return;
+    }
+
+    // 1. Prompt for customized subdomain slug
+    const suggestedSlug = slugify(request.companyName);
+    const companySlug = prompt("Confirm Subdomain Slug for this Company:\n(e.g., entering 'brawn' will create brawn.nextgenudaan.in/app)", suggestedSlug);
+    if (!companySlug) {
+        toast("Provisioning cancelled.", true);
+        return;
+    }
+
+    // 2. Register Firebase Auth Account using Secondary Auth
+    const tempPassword = "NextGen@2026!";
+    let firebaseUser;
+    try {
+        toast("Creating secure login credentials...", false);
+        const authCredential = await createUserWithEmailAndPassword(secondaryAuth, request.buyerEmail, tempPassword);
+        firebaseUser = authCredential.user;
+    } catch (authError) {
+        if (authError.code === "auth/email-already-in-use") {
+            const uid = prompt("An authentication account with this email already exists.\nIf you want to link to their existing account, enter their Firebase UID from the console below (or click Cancel):");
+            if (!uid) {
+                toast("Provisioning cancelled.", true);
+                return;
+            }
+            firebaseUser = { uid, email: request.buyerEmail };
+        } else {
+            console.error("Auth Creation Error:", authError);
+            toast("Failed to create Auth user: " + authError.message, true);
+            return;
+        }
+    }
+
+    // 3. Update subscription record fields first so resolver gets correct tier configuration
+    await updateRecord("subscriptions", request.id, {
+        customerName: request.buyerName,
+        customerEmail: request.buyerEmail,
+        plan: request.plan,
+        status: "active",
+        provisioningStatus: "completed",
+        updatedAt: new Date().toISOString()
+    });
+
+    const subscription = await getRecord("subscriptions", request.id);
+
+    // 4. Provision Company Workspace with Slugified companyId
+    toast("Provisioning workspace...", false);
+    const companyId = await createCompanyWorkspace(subscription, {
+        companyId: companySlug,
+        companyName: request.companyName,
+        ownerId: firebaseUser.uid,
+        ownerName: request.buyerName,
+        ownerEmail: request.buyerEmail
+    });
+
+    // 5. Create Access Pass record
+    const accessPassId = await createRecord("accessPasses", {
+        purchaseRequestId: request.id,
+        subscriptionId: request.id,
+        companyId,
+        ownerId: firebaseUser.uid,
+        ownerEmail: request.buyerEmail,
+        ownerName: request.buyerName,
+        companyName: request.companyName,
+        plan: request.plan,
+        planName: planName(request.plan),
+        maxUsers: resolvePlanLimits(subscription).maxUsers,
+        features: resolvePlanLimits(subscription).features,
+        appUrl: `https://${companySlug}.nextgenudaan.in/app`,
+        status: "active",
+        activatedAt: new Date().toISOString(),
+        activatedBy: state.session.user?.email || "owner"
+    });
+
+    await logActivity({
+        companyId,
+        actorId: state.session.user?.id || "system",
+        action: "purchase_request.provisioned",
+        entityType: "purchaseRequest",
+        entityId: request.id,
+        metadata: { subscriptionId: request.id, accessPassId, plan: request.plan }
+    });
+
+    await loadData();
+    renderShell();
+
+    // 6. Copy details to clipboard and show immersive alert
+    const credentialsText = `Workspace Subdomain: ${companySlug}.nextgenudaan.in/app\nAdmin Email: ${request.buyerEmail}\nDefault Password: ${tempPassword}`;
+    navigator.clipboard?.writeText(credentialsText);
+    alert(`🎉 Workspace Provisioned Successfully!\n\nCredentials have been COPIED to your clipboard:\n\n${credentialsText}\n\nYou can now paste this directly into an email to your client.`);
 }
 
 async function handleCreateSubscription(event) {
@@ -705,25 +985,90 @@ async function handleSubscriptionAction(button) {
     toast(`Subscription ${action} saved.`);
 }
 
+function purchaseRequestTable(requests, compact = false) {
+    if (!requests.length) return empty("No purchase requests in this queue.");
+    return `
+        <div class="table-wrap overflow-x-auto">
+            <table class="w-full text-left">
+                <thead>
+                    <tr class="border-b border-white/5 text-[10px] font-black uppercase tracking-widest text-slate-500">
+                        <th class="px-6 py-4">Buyer</th>
+                        <th class="px-6 py-4">Plan</th>
+                        <th class="px-6 py-4">Status</th>
+                        <th class="px-6 py-4">Provisioning</th>
+                        ${compact ? "" : "<th class=\"px-6 py-4\">Action</th>"}
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-white/5">
+                    ${requests.map((request) => {
+        const completed = request.provisioningStatus === "completed";
+        return `
+                            <tr class="hover:bg-white/5 transition-colors">
+                                <td class="px-6 py-4">
+                                    <div class="font-bold text-slate-200">${escapeHtml(request.companyName || request.buyerName || "Unknown buyer")}</div>
+                                    <div class="text-[10px] text-slate-500 font-medium">${escapeHtml(request.buyerEmail || "")}</div>
+                                </td>
+                                <td class="px-6 py-4">
+                                    ${badge(planName(request.plan), "info")}
+                                    <div class="text-[10px] text-slate-500 mt-1">${request.maxUsers || resolvePlanLimits(request).maxUsers} users</div>
+                                </td>
+                                <td class="px-6 py-4">
+                                    ${badge(request.status || "pending", statusTone(request.status))}
+                                    <div class="text-[10px] text-slate-500 mt-1">${formatDateTime(request.updatedAt || request.createdAt)}</div>
+                                </td>
+                                <td class="px-6 py-4">${badge(request.provisioningStatus || "idle", completed ? "success" : "warning")}</td>
+                                ${compact ? "" : `
+                                    <td class="px-6 py-4">
+                                        <button class="px-4 py-2 rounded-xl bg-blue-600 text-white text-xs font-bold shadow-lg shadow-blue-500/20 hover:scale-105 transition-all disabled:opacity-50 disabled:scale-100" data-provision-request="${request.id}" ${completed ? "disabled" : ""}>
+                                            Activate
+                                        </button>
+                                    </td>
+                                `}
+                            </tr>
+                        `;
+    }).join("")}
+                </tbody>
+            </table>
+        </div>
+    `;
+}
+
 function companyTable(companies) {
     if (!companies.length) return empty("No companies provisioned yet.");
     return `
         <div class="table-wrap">
-            <table>
-                <thead><tr><th>Company</th><th>Plan</th><th>Status</th><th>Users</th><th>Features</th></tr></thead>
-                <tbody>
+            <table class="w-full text-left">
+                <thead>
+                    <tr class="border-b border-white/5 text-[10px] font-black uppercase tracking-widest text-slate-500">
+                        <th class="px-6 py-4">Company</th>
+                        <th class="px-6 py-4">Plan</th>
+                        <th class="px-6 py-4">Status</th>
+                        <th class="px-6 py-4">Users</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-white/5">
                     ${companies.map((company) => {
-                        const used = userCount(company.id);
-                        return `
-                            <tr>
-                                <td><span class="cell-title">${escapeHtml(company.companyName)}</span><span class="cell-sub">${escapeHtml(company.id)}</span></td>
-                                <td>${badge(planName(company.plan), "info")}</td>
-                                <td>${badge(company.status || "unknown", statusTone(company.status))}</td>
-                                <td><span class="cell-title">${used}/${company.maxUsers}</span><div class="progress"><span style="--value:${percent(used, company.maxUsers)}%"></span></div></td>
-                                <td>${(company.features || []).map((feature) => badge(featureLabel(feature), "soft")).join("")}</td>
+        const used = userCount(company.id);
+        return `
+                            <tr class="hover:bg-white/5 transition-colors">
+                                <td class="px-6 py-4">
+                                    <div class="font-bold text-slate-200">${escapeHtml(company.companyName)}</div>
+                                    <div class="text-[10px] text-slate-500 font-medium">${escapeHtml(company.id)}</div>
+                                </td>
+                                <td class="px-6 py-4">${badge(planName(company.plan), "info")}</td>
+                                <td class="px-6 py-4">${badge(company.status || "active", statusTone(company.status))}</td>
+                                <td class="px-6 py-4">
+                                    <div class="flex justify-between text-[10px] font-bold mb-1">
+                                        <span>${used} / ${company.maxUsers}</span>
+                                        <span>${percent(used, company.maxUsers)}%</span>
+                                    </div>
+                                    <div class="h-1.5 w-full bg-white/5 rounded-full overflow-hidden">
+                                        <div class="h-full bg-gradient-to-r from-blue-500 to-indigo-500" style="width: ${percent(used, company.maxUsers)}%"></div>
+                                    </div>
+                                </td>
                             </tr>
                         `;
-                    }).join("")}
+    }).join("")}
                 </tbody>
             </table>
         </div>
@@ -734,16 +1079,25 @@ function userTable(users) {
     if (!users.length) return empty("No users created yet.");
     return `
         <div class="table-wrap">
-            <table>
-                <thead><tr><th>User</th><th>Company</th><th>Role</th><th>Status</th><th>Created</th></tr></thead>
-                <tbody>
+            <table class="w-full text-left">
+                <thead>
+                    <tr class="border-b border-white/5 text-[10px] font-black uppercase tracking-widest text-slate-500">
+                        <th class="px-6 py-4">User</th>
+                        <th class="px-6 py-4">Company</th>
+                        <th class="px-6 py-4">Role</th>
+                        <th class="px-6 py-4">Status</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-white/5">
                     ${users.map((user) => `
-                        <tr>
-                            <td><span class="cell-title">${escapeHtml(user.name)}</span><span class="cell-sub">${escapeHtml(user.email)}</span></td>
-                            <td>${escapeHtml(companyName(user.companyId))}</td>
-                            <td>${badge(ROLE_DEFINITIONS[user.role]?.label || user.role, "info")}</td>
-                            <td>${badge(user.status || "unknown", statusTone(user.status))}</td>
-                            <td>${formatDate(user.createdAt)}</td>
+                        <tr class="hover:bg-white/5 transition-colors">
+                            <td class="px-6 py-4">
+                                <div class="font-bold text-slate-200">${escapeHtml(user.name)}</div>
+                                <div class="text-[10px] text-slate-500 font-medium">${escapeHtml(user.email)}</div>
+                            </td>
+                            <td class="px-6 py-4 text-xs font-medium text-slate-400">${escapeHtml(companyName(user.companyId))}</td>
+                            <td class="px-6 py-4">${badge(ROLE_DEFINITIONS[user.role]?.label || user.role, "info")}</td>
+                            <td class="px-6 py-4">${badge(user.status || "active", statusTone(user.status))}</td>
                         </tr>
                     `).join("")}
                 </tbody>
@@ -756,20 +1110,36 @@ function subscriptionTable(subscriptions) {
     if (!subscriptions.length) return empty("No subscriptions created yet.");
     return `
         <div class="table-wrap">
-            <table>
-                <thead><tr><th>Customer</th><th>Plan</th><th>Status</th><th>Billing</th><th>Actions</th></tr></thead>
-                <tbody>
+            <table class="w-full text-left">
+                <thead>
+                    <tr class="border-b border-white/5 text-[10px] font-black uppercase tracking-widest text-slate-500">
+                        <th class="px-6 py-4">Customer</th>
+                        <th class="px-6 py-4">Plan</th>
+                        <th class="px-6 py-4">Status</th>
+                        <th class="px-6 py-4">Actions</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-white/5">
                     ${subscriptions.map((sub) => `
-                        <tr>
-                            <td><span class="cell-title">${escapeHtml(sub.customerName)}</span><span class="cell-sub">${escapeHtml(sub.customerEmail)}</span></td>
-                            <td>${badge(planName(sub.plan), "info")}<span class="cell-sub">${sub.maxUsers || resolvePlanLimits(sub).maxUsers} users</span></td>
-                            <td>${badge(sub.status || "unknown", statusTone(sub.status))}<span class="cell-sub">${getBlockedReason(sub)}</span></td>
-                            <td><span class="cell-title">${sub.priceMonthly ? inr.format(sub.priceMonthly) : "Custom"}</span><span class="cell-sub">Period end ${formatDate(sub.currentPeriodEnd)}</span></td>
-                            <td>
-                                <button class="btn" data-sub-action="upgrade" data-plan="enterprise" data-sub-id="${sub.id}" title="Upgrade to Enterprise"><i class="fas fa-arrow-up"></i></button>
-                                <button class="btn" data-sub-action="downgrade" data-plan="starter" data-sub-id="${sub.id}" title="Schedule downgrade"><i class="fas fa-arrow-down"></i></button>
-                                <button class="btn" data-sub-action="suspend" data-sub-id="${sub.id}" title="Suspend"><i class="fas fa-ban"></i></button>
-                                <button class="btn btn-danger" data-sub-action="cancel" data-sub-id="${sub.id}" title="Cancel"><i class="fas fa-xmark"></i></button>
+                        <tr class="hover:bg-white/5 transition-colors">
+                            <td class="px-6 py-4">
+                                <div class="font-bold text-slate-200">${escapeHtml(sub.customerName)}</div>
+                                <div class="text-[10px] text-slate-500 font-medium">${escapeHtml(sub.customerEmail)}</div>
+                            </td>
+                            <td class="px-6 py-4">
+                                ${badge(planName(sub.plan), "info")}
+                                <div class="text-[10px] text-slate-500 mt-1">${sub.maxUsers || resolvePlanLimits(sub).maxUsers} users</div>
+                            </td>
+                            <td class="px-6 py-4">
+                                ${badge(sub.status || "active", statusTone(sub.status))}
+                                <div class="text-[10px] text-slate-500 mt-1">Ends ${formatDate(sub.currentPeriodEnd)}</div>
+                            </td>
+                            <td class="px-6 py-4">
+                                <div class="flex gap-2">
+                                    <button class="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center hover:bg-blue-500/20 hover:text-blue-400 transition-all" data-sub-action="upgrade" data-plan="enterprise" data-sub-id="${sub.id}" title="Upgrade"><i class="fas fa-arrow-up text-xs"></i></button>
+                                    <button class="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center hover:bg-amber-500/20 hover:text-amber-400 transition-all" data-sub-action="suspend" data-sub-id="${sub.id}" title="Suspend"><i class="fas fa-ban text-xs"></i></button>
+                                    <button class="w-8 h-8 rounded-lg bg-red-500/10 text-red-500 flex items-center justify-center hover:bg-red-500/20 transition-all" data-sub-action="cancel" data-sub-id="${sub.id}" title="Cancel"><i class="fas fa-trash text-xs"></i></button>
+                                </div>
                             </td>
                         </tr>
                     `).join("")}
@@ -783,14 +1153,21 @@ function activityTable(logs) {
     if (!logs.length) return empty("No activity logs yet.");
     return `
         <div class="table-wrap">
-            <table>
-                <thead><tr><th>Action</th><th>Entity</th><th>When</th></tr></thead>
-                <tbody>
+            <table class="w-full text-left">
+                <thead>
+                    <tr class="border-b border-white/5 text-[10px] font-black uppercase tracking-widest text-slate-500">
+                        <th class="px-6 py-4">Action</th>
+                        <th class="px-6 py-4">When</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-white/5 text-xs">
                     ${logs.map((log) => `
-                        <tr>
-                            <td>${badge(log.action, "info")}</td>
-                            <td><span class="cell-title">${escapeHtml(log.entityType || "record")}</span><span class="cell-sub">${escapeHtml(log.entityId || "")}</span></td>
-                            <td>${formatDateTime(log.createdAt)}</td>
+                        <tr class="hover:bg-white/5 transition-colors">
+                            <td class="px-6 py-4">
+                                <div class="font-bold text-slate-300">${log.action.replace(/_/g, ' ')}</div>
+                                <div class="text-[10px] text-slate-500 font-medium uppercase">${log.entityType}</div>
+                            </td>
+                            <td class="px-6 py-4 text-slate-500">${formatDateTime(log.createdAt)}</td>
                         </tr>
                     `).join("")}
                 </tbody>
@@ -831,22 +1208,50 @@ function planCard(plan) {
     `;
 }
 
-function metric(label, value, icon) {
+function metric(label, value, icon, color = "blue") {
+    const colors = {
+        blue: "from-blue-600 to-indigo-600 shadow-blue-500/20 text-blue-500",
+        emerald: "from-emerald-500 to-teal-500 shadow-emerald-500/20 text-emerald-500",
+        amber: "from-amber-400 to-orange-500 shadow-amber-500/20 text-amber-500",
+        indigo: "from-indigo-600 to-violet-600 shadow-indigo-500/20 text-indigo-500",
+        rose: "from-rose-500 to-pink-500 shadow-rose-500/20 text-rose-500"
+    };
+
+    const selected = colors[color] || colors.blue;
+
     return `
-        <div class="metric">
-            <div class="metric-icon"><i class="fas ${icon}"></i></div>
-            <div class="metric-value">${value}</div>
-            <div class="metric-label">${label}</div>
+        <div class="panel glass-card p-6 flex items-center gap-6 group hover-lift transition-all">
+            <div class="w-14 h-14 rounded-2xl bg-gradient-to-br ${selected.split(" ").slice(0, 2).join(" ")} flex items-center justify-center text-white text-xl shadow-lg ${selected.split(" ")[2]} group-hover:scale-110 transition-transform">
+                <i class="fas ${icon}"></i>
+            </div>
+            <div>
+                <div class="text-xs font-black uppercase tracking-widest text-slate-500 mb-1">${label}</div>
+                <div class="text-3xl font-black text-white">${value}</div>
+            </div>
         </div>
     `;
 }
 
 function domainItem(title, value) {
-    return `<div class="domain-item"><strong>${escapeHtml(title)}</strong><span>${escapeHtml(value)}</span></div>`;
+    return `
+        <div class="p-4 rounded-xl bg-white/5 border border-white/5 flex justify-between items-center group hover:bg-white/10 transition-all">
+            <strong class="text-sm font-bold">${escapeHtml(title)}</strong>
+            <span class="text-xs text-slate-500 font-medium">${escapeHtml(value)}</span>
+        </div>
+    `;
 }
 
 function badge(text, tone = "soft") {
-    return `<span class="badge badge-${tone}">${escapeHtml(text)}</span>`;
+    const tones = {
+        success: "bg-emerald-500/10 text-emerald-400 border-emerald-500/20",
+        warning: "bg-amber-500/10 text-amber-400 border-amber-500/20",
+        danger: "bg-rose-500/10 text-rose-400 border-rose-500/20",
+        info: "bg-blue-500/10 text-blue-400 border-blue-500/20",
+        soft: "bg-slate-500/10 text-slate-400 border-slate-500/20"
+    };
+
+    const cls = tones[tone] || tones.soft;
+    return `<span class="px-2.5 py-1 rounded-lg border text-[10px] font-black uppercase tracking-wider ${cls}">${escapeHtml(text)}</span>`;
 }
 
 function empty(message) {
@@ -854,9 +1259,9 @@ function empty(message) {
 }
 
 function statusTone(status = "") {
-    if (["active", "accepted"].includes(status)) return "success";
-    if (["trialing", "grace", "invited", "pending"].includes(status)) return "warning";
-    if (["suspended", "cancelled", "expired", "past_due", "disabled"].includes(status)) return "danger";
+    if (["active", "accepted", "payment_received", "owner_confirmed", "completed"].includes(status)) return "success";
+    if (["trialing", "grace", "invited", "pending", "pending_payment", "not_started"].includes(status)) return "warning";
+    if (["suspended", "cancelled", "expired", "past_due", "disabled", "halted", "payment_failed"].includes(status)) return "danger";
     return "soft";
 }
 
@@ -885,6 +1290,7 @@ function featureLabel(featureKey) {
 }
 
 function primaryActionLabel() {
+    if (state.view === "requests") return "Review Request";
     if (state.view === "companies") return "Create Company";
     if (state.view === "users") return "Invite User";
     if (state.view === "roles") return "Assign Role";

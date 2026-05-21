@@ -4,7 +4,9 @@ import {
     signOut
 } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
 import { auth } from "./firebase.js";
-import { getRecord } from "./firestoreService.js";
+import { getRecord, setRecord } from "./firestoreService.js";
+
+const OWNER_EMAIL = "nextgenudaan@gmail.com";
 
 export function watchAuth(callback) {
     return onAuthStateChanged(auth, callback);
@@ -24,6 +26,7 @@ export async function loadAccessSession(firebaseUser) {
         return { firebaseUser: null, user: null, company: null, subscription: null, blocked: false };
     }
 
+    const email = (firebaseUser.email || "").toLowerCase();
     const platformAdmin = await safeGetRecord("platformAdmins", firebaseUser.uid);
     if (platformAdmin?.status === "active") {
         return {
@@ -34,7 +37,7 @@ export async function loadAccessSession(firebaseUser) {
                 userId: firebaseUser.uid,
                 name: platformAdmin.name || firebaseUser.email || "Platform Admin",
                 email: firebaseUser.email,
-                role: "platform_admin",
+                role: platformAdmin.role || "owner",
                 status: "active"
             },
             company: null,
@@ -44,6 +47,30 @@ export async function loadAccessSession(firebaseUser) {
         };
     }
 
+    if (email === OWNER_EMAIL) {
+        try {
+            await setRecord("platformAdmins", firebaseUser.uid, {
+                name: "NextGen Udaan Owner",
+                email: OWNER_EMAIL,
+                role: "owner",
+                status: "active",
+                bootstrappedBy: "owner_email"
+            });
+            return loadAccessSession(firebaseUser);
+        } catch (error) {
+            return {
+                firebaseUser,
+                user: null,
+                company: null,
+                subscription: null,
+                blocked: true,
+                ownerOnly: true,
+                ownerBootstrapMissing: true,
+                blockedReason: `Owner profile is not initialized. Create /platformAdmins/${firebaseUser.uid} with email "${OWNER_EMAIL}", role "owner", and status "active".`
+            };
+        }
+    }
+
     return {
         firebaseUser,
         user: null,
@@ -51,7 +78,7 @@ export async function loadAccessSession(firebaseUser) {
         subscription: null,
         blocked: true,
         ownerOnly: true,
-        blockedReason: `This private control panel requires /platformAdmins/${firebaseUser.uid} with status "active".`
+        blockedReason: `This private control panel is restricted to ${OWNER_EMAIL}.`
     };
 
 }

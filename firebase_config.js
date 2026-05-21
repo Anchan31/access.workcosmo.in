@@ -4,13 +4,14 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebas
 import { getAuth } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
 import { getFirestore } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
-const firebaseConfig = {
+export const firebaseConfig = {
     apiKey: "AIzaSyDKuFUJyHUl5AIFSFHCg-4S_wadsha6Et4",
     authDomain: "recruitment-suite-hr.firebaseapp.com",
     projectId: "recruitment-suite-hr",
     storageBucket: "recruitment-suite-hr.firebasestorage.app",
     messagingSenderId: "1049067446272",
-    appId: "1:1049067446272:web:a0eb4e5a9fac1589a8f8e5"
+    appId: "1:1049067446272:web:a0eb4e5a9fac1589a8f8e5",
+    measurementId: "G-87FVXXYEP7"
 };
 
 // Initialize Firebase

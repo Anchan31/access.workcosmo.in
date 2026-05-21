@@ -77,30 +77,31 @@ export async function updateRecord(path, id, payload) {
 
 export async function atomicCreateCompany({ company, owner, subscriptionId }) {
     return runTransaction(db, async (transaction) => {
-        const companyRef = doc(collection(db, "companies"));
+        const cid = company.companyId || doc(collection(db, "companies")).id;
+        const companyRef = doc(db, "companies", cid);
         const ownerRef = doc(db, "users", owner.userId);
         const subscriptionRef = doc(db, "subscriptions", subscriptionId);
 
         transaction.set(companyRef, {
             ...company,
-            companyId: companyRef.id,
+            companyId: cid,
             createdAt: serverTimestamp(),
             updatedAt: serverTimestamp()
         });
 
         transaction.set(ownerRef, {
             ...owner,
-            companyId: companyRef.id,
+            companyId: cid,
             createdAt: serverTimestamp(),
             updatedAt: serverTimestamp()
         });
 
         transaction.update(subscriptionRef, {
-            companyId: companyRef.id,
+            companyId: cid,
             updatedAt: serverTimestamp()
         });
 
-        return companyRef.id;
+        return cid;
     });
 }
 

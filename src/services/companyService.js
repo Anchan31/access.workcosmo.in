@@ -10,6 +10,7 @@ export async function createCompanyWorkspace(subscription, input) {
     return atomicCreateCompany({
         subscriptionId: subscription.id,
         company: {
+            companyId: input.companyId,
             companyName: input.companyName,
             ownerId,
             subscriptionId: subscription.id,

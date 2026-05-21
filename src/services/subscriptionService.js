@@ -16,11 +16,15 @@ export async function createSubscription(input) {
 
     return createRecord("subscriptions", {
         subscriptionId: input.subscriptionId || `sub_${crypto.randomUUID()}`,
+        purchaseRequestId: input.purchaseRequestId || "",
+        firebaseUid: input.firebaseUid || "",
         razorpayCustomerId: input.razorpayCustomerId || "",
         razorpaySubscriptionId: input.razorpaySubscriptionId || "",
+        razorpayPlanId: input.razorpayPlanId || "",
         customerName: input.customerName,
         customerEmail: input.customerEmail.toLowerCase(),
         billingEmail: input.billingEmail?.toLowerCase() || input.customerEmail.toLowerCase(),
+        companyName: input.companyName || "",
         plan: plan.id,
         priceMonthly: limits.priceMonthly,
         maxUsers: limits.maxUsers,
@@ -32,7 +36,9 @@ export async function createSubscription(input) {
         currentPeriodEnd: input.currentPeriodEnd || null,
         gracePeriodDays: Number(input.gracePeriodDays || 7),
         cancelAtPeriodEnd: false,
-        lastPaymentStatus: input.lastPaymentStatus || "not_started"
+        lastPaymentStatus: input.lastPaymentStatus || "not_started",
+        manuallyConfirmedBy: input.manuallyConfirmedBy || "",
+        manuallyConfirmedAt: input.manuallyConfirmedAt || null
     });
 }
 
