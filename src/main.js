@@ -415,6 +415,10 @@ function renderCompanies() {
                         <input id="companyName" required placeholder="e.g. Udaan Talent Partners">
                     </div>
                     <div class="field">
+                        <label for="companySubdomain">Client ID / Subdomain</label>
+                        <input id="companySubdomain" required placeholder="e.g. udaan-talent">
+                    </div>
+                    <div class="field">
                         <label for="ownerId">Firebase Auth UID</label>
                         <input id="ownerId" required placeholder="UID for the customer login you created">
                     </div>
@@ -752,6 +756,14 @@ function bindViewEvents() {
     document.getElementById("userForm")?.addEventListener("submit", handleInviteUser);
     document.getElementById("roleForm")?.addEventListener("submit", handleAssignRole);
 
+    const companyNameInput = document.getElementById("companyName");
+    const companySubdomainInput = document.getElementById("companySubdomain");
+    if (companyNameInput && companySubdomainInput && !companySubdomainInput.value) {
+        companyNameInput.addEventListener("input", () => {
+            companySubdomainInput.value = getClientId(companyNameInput.value);
+        });
+    }
+
     document.querySelectorAll("[data-provision-request]").forEach((button) => {
         button.addEventListener("click", () => handleProvisionRequest(button.dataset.provisionRequest));
     });
@@ -774,6 +786,10 @@ function slugify(text) {
         .replace(/-+$/, '');            // Trim - from end
 }
 
+function getClientId(value) {
+    return slugify(value || "");
+}
+
 async function handleProvisionRequest(requestId) {
     const request = state.purchaseRequests.find((item) => item.id === requestId);
     if (!request) {
@@ -782,8 +798,8 @@ async function handleProvisionRequest(requestId) {
     }
 
     // 1. Prompt for customized subdomain slug
-    const suggestedSlug = slugify(request.companyName);
-    const companySlug = prompt("Confirm Subdomain Slug for this Company:\n(e.g., entering 'brawn' will create brawn.nextgenudaan.in/app)", suggestedSlug);
+    const suggestedSlug = getClientId(request.companyName);
+    const companySlug = getClientId(prompt("Confirm Client ID / Subdomain for this Company:\n(e.g., entering 'brawn' will create brawn.nextgenudaan.in/app)", suggestedSlug));
     if (!companySlug) {
         toast("Provisioning cancelled.", true);
         return;
@@ -897,7 +913,13 @@ async function handleCreateSubscription(event) {
 async function handleCreateCompany(event) {
     event.preventDefault();
     const subscription = await getRecord("subscriptions", document.getElementById("companySubscription").value);
+    const companySubdomain = getClientId(document.getElementById("companySubdomain").value);
+    if (!companySubdomain) {
+        toast("Enter a valid client ID / subdomain.", true);
+        return;
+    }
     const companyId = await createCompanyWorkspace(subscription, {
+        companyId: companySubdomain,
         companyName: document.getElementById("companyName").value.trim(),
         ownerId: document.getElementById("ownerId").value.trim(),
         ownerName: document.getElementById("ownerName").value.trim(),

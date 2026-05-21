@@ -11,6 +11,8 @@ export async function createCompanyWorkspace(subscription, input) {
         subscriptionId: subscription.id,
         company: {
             companyId: input.companyId,
+            clientId: input.companyId,
+            subdomain: input.companyId,
             companyName: input.companyName,
             ownerId,
             subscriptionId: subscription.id,

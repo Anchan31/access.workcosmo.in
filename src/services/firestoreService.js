@@ -86,6 +86,10 @@ export async function atomicCreateCompany({ company, owner, subscriptionId }) {
         const companyRef = doc(db, "companies", cid);
         const ownerRef = doc(db, "users", owner.userId);
         const subscriptionRef = doc(db, "subscriptions", subscriptionId);
+        const existingCompany = await transaction.get(companyRef);
+        if (existingCompany.exists()) {
+            throw new Error(`Client ID "${cid}" is already in use.`);
+        }
 
         transaction.set(companyRef, {
             ...company,
