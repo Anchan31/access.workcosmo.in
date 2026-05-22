@@ -1016,16 +1016,16 @@ function openModal(title, contentText, isReadOnly, onSave) {
             
             if (value === null) {
                 html += `
-                    <div class="mb-4">
-                        <label class="block text-xs font-bold text-slate-400 mb-2">${escapeHtml(fieldLabel)}</label>
-                        <input type="text" id="${fieldId}" value="null" ${isReadOnly ? "disabled" : ""} class="w-full px-3 py-2 bg-black/50 border border-white/10 rounded-lg text-slate-300 text-sm focus:border-blue-500 outline-none transition-colors" />
+                    <div class="mb-3">
+                        <label class="block text-xs font-bold text-slate-400 mb-1">${escapeHtml(fieldLabel)}</label>
+                        <input type="text" id="${fieldId}" value="null" ${isReadOnly ? "disabled" : ""} class="w-full px-3 py-1.5 bg-black/50 border border-white/10 rounded-lg text-slate-300 text-xs focus:border-blue-500 outline-none transition-colors" />
                     </div>
                 `;
             } else if (typeof value === "boolean") {
                 html += `
-                    <div class="mb-4">
-                        <label class="block text-xs font-bold text-slate-400 mb-2">${escapeHtml(fieldLabel)}</label>
-                        <select id="${fieldId}" ${isReadOnly ? "disabled" : ""} class="w-full px-3 py-2 bg-black/50 border border-white/10 rounded-lg text-slate-300 text-sm focus:border-blue-500 outline-none transition-colors">
+                    <div class="mb-3">
+                        <label class="block text-xs font-bold text-slate-400 mb-1">${escapeHtml(fieldLabel)}</label>
+                        <select id="${fieldId}" ${isReadOnly ? "disabled" : ""} class="w-full px-3 py-1.5 bg-black/50 border border-white/10 rounded-lg text-slate-300 text-xs focus:border-blue-500 outline-none transition-colors">
                             <option value="true" ${value === true ? "selected" : ""}>True</option>
                             <option value="false" ${value === false ? "selected" : ""}>False</option>
                         </select>
@@ -1033,32 +1033,32 @@ function openModal(title, contentText, isReadOnly, onSave) {
                 `;
             } else if (typeof value === "number") {
                 html += `
-                    <div class="mb-4">
-                        <label class="block text-xs font-bold text-slate-400 mb-2">${escapeHtml(fieldLabel)}</label>
-                        <input type="number" id="${fieldId}" value="${value}" ${isReadOnly ? "disabled" : ""} class="w-full px-3 py-2 bg-black/50 border border-white/10 rounded-lg text-slate-300 text-sm focus:border-blue-500 outline-none transition-colors" />
+                    <div class="mb-3">
+                        <label class="block text-xs font-bold text-slate-400 mb-1">${escapeHtml(fieldLabel)}</label>
+                        <input type="number" id="${fieldId}" value="${value}" ${isReadOnly ? "disabled" : ""} class="w-full px-3 py-1.5 bg-black/50 border border-white/10 rounded-lg text-slate-300 text-xs focus:border-blue-500 outline-none transition-colors" />
                     </div>
                 `;
             } else if (Array.isArray(value)) {
                 html += `
-                    <div class="mb-4">
-                        <label class="block text-xs font-bold text-slate-400 mb-2">${escapeHtml(fieldLabel)}</label>
-                        <textarea id="${fieldId}" ${isReadOnly ? "disabled" : ""} class="w-full px-3 py-2 bg-black/50 border border-white/10 rounded-lg text-slate-300 text-xs font-mono focus:border-blue-500 outline-none transition-colors resize-none h-20">${JSON.stringify(value, null, 2)}</textarea>
+                    <div class="mb-3">
+                        <label class="block text-xs font-bold text-slate-400 mb-1">${escapeHtml(fieldLabel)}</label>
+                        <textarea id="${fieldId}" ${isReadOnly ? "disabled" : ""} class="w-full px-3 py-1.5 bg-black/50 border border-white/10 rounded-lg text-slate-300 text-xs font-mono focus:border-blue-500 outline-none transition-colors resize-none h-16">${JSON.stringify(value, null, 2)}</textarea>
                     </div>
                 `;
             } else if (typeof value === "object" && value !== null) {
                 html += `
-                    <div class="mb-4 p-3 bg-white/5 border border-white/10 rounded-lg">
-                        <label class="block text-xs font-bold text-slate-300 mb-3">${escapeHtml(fieldLabel)}</label>
-                        <div class="ml-2">
+                    <div class="mb-3 p-2 bg-white/5 border border-white/10 rounded-lg">
+                        <label class="block text-xs font-bold text-slate-300 mb-2">${escapeHtml(fieldLabel)}</label>
+                        <div class="ml-1">
                             ${generateFormFields(value, `${prefix}${key}-`)}
                         </div>
                     </div>
                 `;
             } else {
                 html += `
-                    <div class="mb-4">
-                        <label class="block text-xs font-bold text-slate-400 mb-2">${escapeHtml(fieldLabel)}</label>
-                        <input type="text" id="${fieldId}" value="${escapeHtml(String(value))}" ${isReadOnly ? "disabled" : ""} class="w-full px-3 py-2 bg-black/50 border border-white/10 rounded-lg text-slate-300 text-sm focus:border-blue-500 outline-none transition-colors" />
+                    <div class="mb-3">
+                        <label class="block text-xs font-bold text-slate-400 mb-1">${escapeHtml(fieldLabel)}</label>
+                        <input type="text" id="${fieldId}" value="${escapeHtml(String(value))}" ${isReadOnly ? "disabled" : ""} class="w-full px-3 py-1.5 bg-black/50 border border-white/10 rounded-lg text-slate-300 text-xs focus:border-blue-500 outline-none transition-colors" />
                     </div>
                 `;
             }
@@ -1070,19 +1070,19 @@ function openModal(title, contentText, isReadOnly, onSave) {
     modal.id = "custom-modal";
     modal.className = "fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/80 backdrop-blur-sm p-4 animate-fade-in";
     modal.innerHTML = `
-        <div class="bg-slate-900 border border-white/10 rounded-2xl shadow-2xl w-full max-w-2xl overflow-hidden flex flex-col max-h-[75vh]">
-            <div class="p-6 border-b border-white/5 flex justify-between items-center bg-white/5">
-                <h3 class="text-lg font-bold text-white">${escapeHtml(title)}</h3>
-                <button id="modal-close" class="text-slate-400 hover:text-white transition-colors"><i class="fas fa-times"></i></button>
+        <div class="bg-slate-900 border border-white/10 rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden flex flex-col max-h-[70vh]">
+            <div class="px-6 py-4 border-b border-white/5 flex justify-between items-center bg-white/5 flex-shrink-0">
+                <h3 class="text-base font-bold text-white truncate">${escapeHtml(title)}</h3>
+                <button id="modal-close" class="text-slate-400 hover:text-white transition-colors flex-shrink-0 ml-4"><i class="fas fa-times"></i></button>
             </div>
-            <div class="p-6 overflow-y-auto flex-1">
-                <form id="modal-form" class="space-y-1">
+            <div class="px-5 py-4 overflow-y-auto flex-1 min-h-0">
+                <form id="modal-form" class="space-y-3">
                     ${generateFormFields(data)}
                 </form>
             </div>
-            <div class="p-6 border-t border-white/5 bg-black/20 flex justify-end gap-3">
-                <button id="modal-cancel" class="px-4 py-2 rounded-xl bg-white/5 hover:bg-white/10 text-white text-sm font-bold transition-all">Close</button>
-                ${isReadOnly ? "" : `<button id="modal-save" type="button" class="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-sm font-bold shadow-lg shadow-blue-500/20 transition-all">Save Changes</button>`}
+            <div class="px-6 py-4 border-t border-white/5 bg-black/20 flex justify-end gap-2 flex-shrink-0">
+                <button id="modal-cancel" class="px-3 py-2 rounded-lg bg-white/5 hover:bg-white/10 text-white text-xs font-bold transition-all">Close</button>
+                ${isReadOnly ? "" : `<button id="modal-save" type="button" class="px-3 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold shadow-lg shadow-blue-500/20 transition-all">Save</button>`}
             </div>
         </div>
     `;
