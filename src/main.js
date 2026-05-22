@@ -1070,7 +1070,7 @@ function openModal(title, contentText, isReadOnly, onSave) {
     modal.id = "custom-modal";
     modal.className = "fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/80 backdrop-blur-sm p-4 animate-fade-in";
     modal.innerHTML = `
-        <div class="bg-slate-900 border border-white/10 rounded-2xl shadow-2xl w-full max-w-3xl overflow-hidden flex flex-col max-h-[90vh]">
+        <div class="bg-slate-900 border border-white/10 rounded-2xl shadow-2xl w-full max-w-2xl overflow-hidden flex flex-col max-h-[75vh]">
             <div class="p-6 border-b border-white/5 flex justify-between items-center bg-white/5">
                 <h3 class="text-lg font-bold text-white">${escapeHtml(title)}</h3>
                 <button id="modal-close" class="text-slate-400 hover:text-white transition-colors"><i class="fas fa-times"></i></button>
