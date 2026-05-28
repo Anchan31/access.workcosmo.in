@@ -589,7 +589,7 @@ function renderRoles() {
             </div>
 
             <!-- Lower Action Row -->
-            <div class="grid grid-cols-1 lg:grid-cols-[1.2fr_1fr] gap-8 items-start">
+            <div class="grid gap-8">
                 <!-- Role Assignment -->
                 <div class="bg-white/90 backdrop-blur-lg border border-slate-200 rounded-3xl p-6 shadow-lg shadow-slate-200/40">
                     <div class="border-b border-slate-100 pb-4 mb-5">
@@ -631,22 +631,6 @@ function renderRoles() {
                             <i class="fas fa-user-shield"></i> Update Permissions
                         </button>
                     </form>
-                </div>
-
-                <!-- Unified Identity Info -->
-                <div class="bg-white/90 backdrop-blur-lg border border-slate-200 rounded-3xl p-8 flex flex-col justify-center items-center text-center space-y-5 shadow-lg shadow-slate-200/40">
-                    <div class="w-16 h-16 rounded-2xl bg-gradient-to-br from-blue-500 to-indigo-500 flex items-center justify-center text-slate-900 text-2xl shadow-lg shadow-blue-500/20">
-                        <i class="fas fa-fingerprint"></i>
-                    </div>
-                    <div>
-                        <h3 class="text-xl font-black text-slate-800 mb-2">Unified Identity Suite</h3>
-                        <p class="text-sm text-slate-500 leading-relaxed">Nextgen RBAC permissions propagate instantly. A role assigned in this Access Portal modifies tenant capability checks in real-time across the entire SaaS workspace.</p>
-                    </div>
-                    <div class="w-full space-y-3.5 mt-2">
-                        ${domainItem("Data Isolation", "Strict Tenant-Level")}
-                        ${domainItem("Synchronization", "Real-time Firestore Streams")}
-                        ${domainItem("Security Engine", "Ecosystem RBAC Helpers")}
-                    </div>
                 </div>
             </div>
         </div>

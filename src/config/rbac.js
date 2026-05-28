@@ -1,15 +1,9 @@
 export const PERMISSIONS = {
     fullAccess: "full_access",
-    manageUsers: "manage_users",
-    manageRoles: "manage_roles",
-    manageBilling: "manage_billing",
-    manageJobs: "manage_jobs",
-    manageCandidates: "manage_candidates",
-    useDialer: "use_dialer",
-    shareProfiles: "share_profiles",
-    readOnly: "read_only",
-    viewAnalytics: "view_analytics",
-    useQrBridgeLogin: "use_qr_bridge_login"
+    app: "/app",
+    share: "/share",
+    careers: "/careers",
+    dialer: "dialer"
 };
 
 export const ROLE_DEFINITIONS = {
@@ -17,27 +11,30 @@ export const ROLE_DEFINITIONS = {
         id: "admin",
         label: "Admin",
         permissions: [
-            PERMISSIONS.manageUsers,
-            PERMISSIONS.readOnly,
-            PERMISSIONS.viewAnalytics,
-            PERMISSIONS.shareProfiles,
-            PERMISSIONS.useDialer
+            PERMISSIONS.app,
+            PERMISSIONS.share,
+            PERMISSIONS.careers,
+            PERMISSIONS.dialer
         ]
     },
     recruiter: {
         id: "recruiter",
         label: "Recruiter",
-        permissions: Object.values(PERMISSIONS)
+        permissions: [
+            PERMISSIONS.app,
+            PERMISSIONS.share,
+            PERMISSIONS.careers
+        ]
     }
 };
 
 export const MODULE_REQUIREMENTS = {
-    recruitModule: [PERMISSIONS.manageJobs, PERMISSIONS.manageCandidates, PERMISSIONS.readOnly],
-    careerPortal: [PERMISSIONS.manageJobs, PERMISSIONS.readOnly],
-    shareProfile: [PERMISSIONS.shareProfiles],
-    dialer: [PERMISSIONS.useDialer],
-    qrBridgeLogin: [PERMISSIONS.useQrBridgeLogin],
-    advancedAnalytics: [PERMISSIONS.viewAnalytics]
+    recruitModule: [PERMISSIONS.app],
+    careerPortal: [PERMISSIONS.careers],
+    shareProfile: [PERMISSIONS.share],
+    dialer: [PERMISSIONS.dialer],
+    qrBridgeLogin: [PERMISSIONS.app],
+    advancedAnalytics: [PERMISSIONS.app]
 };
 
 export function getRole(roleId = "admin") {
