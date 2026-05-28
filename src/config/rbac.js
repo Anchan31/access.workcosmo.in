@@ -37,6 +37,28 @@ export const MODULE_REQUIREMENTS = {
     advancedAnalytics: [PERMISSIONS.app]
 };
 
+export let DYNAMIC_ROLES = {};
+
+export function registerDynamicRoles(rolesArray) {
+    DYNAMIC_ROLES = {};
+    if (Array.isArray(rolesArray)) {
+        rolesArray.forEach(role => {
+            const id = role.roleId || role.id;
+            DYNAMIC_ROLES[id] = {
+                id: id,
+                label: role.label || role.name || id,
+                permissions: role.permissions || [],
+                custom: true,
+                docId: role.id // Firestore document ID for update/delete
+            };
+        });
+    }
+}
+
+export function getAllRoles() {
+    return { ...ROLE_DEFINITIONS, ...DYNAMIC_ROLES };
+}
+
 export function getRole(roleId = "admin") {
-    return ROLE_DEFINITIONS[roleId] || ROLE_DEFINITIONS.admin;
+    return getAllRoles()[roleId] || ROLE_DEFINITIONS.admin;
 }

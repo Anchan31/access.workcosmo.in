@@ -1,5 +1,5 @@
 import { PLAN_CATALOG, FEATURES, resolvePlanLimits } from "./config/plans.js";
-import { PERMISSIONS, ROLE_DEFINITIONS } from "./config/rbac.js";
+import { PERMISSIONS, ROLE_DEFINITIONS, registerDynamicRoles, getAllRoles, DYNAMIC_ROLES } from "./config/rbac.js";
 import {
     canAccessModule,
     canAddUser,
@@ -18,6 +18,7 @@ import {
 } from "./services/subscriptionService.js";
 import { escapeHtml, formatDate, formatDateTime, inr, initials, percent } from "./utils/format.js";
 import { toast } from "./utils/toast.js";
+import { createCustomRole, updateCustomRole } from "./services/roleService.js";
 import { secondaryAuth } from "./services/firebase.js";
 import { createUserWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
 import { openModal } from "./components/modal.js";
@@ -84,7 +85,8 @@ let state = {
     emailSearch: "",
     userSearch: "",
     userCompanyFilter: "",
-    userRoleFilter: ""
+    userRoleFilter: "",
+    editingRoleId: null
 };
 
 document.addEventListener("DOMContentLoaded", () => {
@@ -151,6 +153,7 @@ async function loadData() {
         permissions,
         emails
     };
+    registerDynamicRoles(roles);
 }
 
 async function safeList(path) {
@@ -497,7 +500,7 @@ function renderUsers() {
                         <div>
                             <select id="userRoleFilter" class="w-full min-h-[42px] px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 transition-all text-sm">
                                 <option value="">All Roles</option>
-                                ${Object.entries(ROLE_DEFINITIONS).map(([key, role]) => `<option value="${key}" ${state.userRoleFilter === key ? "selected" : ""}>${escapeHtml(role.label)}</option>`).join("")}
+                                ${Object.entries(getAllRoles()).map(([key, role]) => `<option value="${key}" ${state.userRoleFilter === key ? "selected" : ""}>${escapeHtml(role.label)}</option>`).join("")}
                             </select>
                         </div>
                     </div>
@@ -512,7 +515,7 @@ function renderUsers() {
     `;
 }
 function renderRoles() {
-    const roles = Object.values(ROLE_DEFINITIONS);
+    const roles = Object.values(getAllRoles());
     const permissions = Object.values(PERMISSIONS);
 
     // Calculate metrics
@@ -589,7 +592,7 @@ function renderRoles() {
             </div>
 
             <!-- Lower Action Row -->
-            <div class="grid gap-8">
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 items-start">
                 <!-- Role Assignment -->
                 <div class="bg-white/90 backdrop-blur-lg border border-slate-200 rounded-3xl p-6 shadow-lg shadow-slate-200/40">
                     <div class="border-b border-slate-100 pb-4 mb-5">
@@ -632,9 +635,72 @@ function renderRoles() {
                         </button>
                     </form>
                 </div>
+
+                <!-- Custom Roles Management -->
+                <div class="bg-white/90 backdrop-blur-lg border border-slate-200 rounded-3xl p-6 shadow-lg shadow-slate-200/40">
+                    <div class="border-b border-slate-100 pb-4 mb-5 flex justify-between items-center">
+                        <div>
+                            <h3 class="text-lg font-black text-slate-800">${state.editingRoleId ? "Edit Custom Role" : "Create Custom Role"}</h3>
+                            <p class="text-slate-500 text-sm font-medium">Define custom privileges and access scopes</p>
+                        </div>
+                        ${state.editingRoleId ? `<button id="btnCancelRoleEdit" class="text-xs font-bold text-slate-500 hover:text-slate-800"><i class="fas fa-xmark"></i> Cancel</button>` : ""}
+                    </div>
+
+                    <form id="customRoleForm" class="space-y-4">
+                        <div class="grid gap-1.5">
+                            <label class="text-xs font-black text-slate-500 uppercase tracking-widest">Role Name / Label</label>
+                            <input id="customRoleLabel" type="text" required placeholder="e.g. Recruitment Lead" class="w-full min-h-[42px] px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 outline-none focus:border-pink-500 focus:ring-4 focus:ring-pink-500/10 transition-all text-sm" />
+                        </div>
+
+                        <div class="grid gap-1.5">
+                            <label class="text-xs font-black text-slate-500 uppercase tracking-widest">Access Selector (Permissions)</label>
+                            <div class="grid grid-cols-2 gap-2 mt-1">
+                                ${Object.entries(PERMISSIONS)
+                                    .filter(([key]) => key !== "fullAccess")
+                                    .map(([key, value]) => `
+                                        <label class="flex items-center gap-2.5 p-3 rounded-xl border border-slate-200 bg-slate-50/50 cursor-pointer hover:border-pink-300 hover:bg-white transition-all has-[:checked]:border-pink-500 has-[:checked]:bg-white has-[:checked]:ring-4 has-[:checked]:ring-pink-500/10">
+                                            <input type="checkbox" name="customRolePerms" value="${value}" class="rounded text-pink-500 focus:ring-pink-500/10" />
+                                            <span class="text-sm font-bold text-slate-800">${value}</span>
+                                        </label>
+                                    `).join("")}
+                            </div>
+                        </div>
+
+                        <button type="submit" class="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 font-bold rounded-xl bg-gradient-to-r from-blue-600 to-pink-500 text-slate-900 hover:scale-[1.02] hover:shadow-lg hover:shadow-pink-500/25 transition-all text-sm">
+                            <i class="fas fa-floppy-disk"></i> ${state.editingRoleId ? "Save Changes" : "Create Role"}
+                        </button>
+                    </form>
+
+                    <!-- Existing Custom Roles List -->
+                    <div class="mt-8 border-t border-slate-100 pt-6">
+                        <h4 class="text-xs font-black text-slate-500 uppercase tracking-widest mb-4">Custom Roles</h4>
+                        ${Object.keys(DYNAMIC_ROLES).length === 0 ? `
+                            <p class="text-xs font-medium text-slate-400 italic">No custom roles created yet.</p>
+                        ` : `
+                            <div class="space-y-3">
+                                ${Object.values(DYNAMIC_ROLES).map(role => `
+                                    <div class="flex items-center justify-between p-4 rounded-xl border border-slate-200 bg-slate-50/50 hover:bg-white hover:shadow-sm transition-all animate-fade-in">
+                                        <div>
+                                            <strong class="text-sm text-slate-800 font-bold">${escapeHtml(role.label)}</strong>
+                                            <div class="text-[10px] text-slate-500 mt-1">${role.id}</div>
+                                            <div class="flex gap-1 mt-1.5 flex-wrap">
+                                                ${role.permissions.map(p => badge(p, "soft")).join("")}
+                                            </div>
+                                        </div>
+                                        <div class="flex gap-2">
+                                            <button class="w-8 h-8 rounded-lg bg-blue-50 text-blue-600 hover:bg-blue-100 flex items-center justify-center transition-colors" data-edit-role="${role.docId}" title="Edit role"><i class="fas fa-pen text-xs"></i></button>
+                                            <button class="w-8 h-8 rounded-lg bg-rose-50 text-rose-600 hover:bg-rose-100 flex items-center justify-center transition-colors" data-delete-role="${role.docId}" title="Delete role"><i class="fas fa-trash text-xs"></i></button>
+                                        </div>
+                                    </div>
+                                `).join("")}
+                            </div>
+                        `}
+                    </div>
+                </div>
             </div>
         </div>
     `;
+}
 }
 
 function renderSubscriptions() {
@@ -926,7 +992,7 @@ function bindViewEvents() {
         if (userId && container && badgeSpan) {
             const user = state.users.find((u) => u.id === userId);
             if (user) {
-                const roleLabel = ROLE_DEFINITIONS[user.role]?.label || user.role || "None";
+                const roleLabel = getAllRoles()[user.role]?.label || user.role || "None";
                 badgeSpan.innerHTML = badge(roleLabel, "info");
                 container.classList.remove("hidden");
             } else {
@@ -960,6 +1026,19 @@ function bindViewEvents() {
 
     document.querySelectorAll("[data-record-action]").forEach((button) => {
         button.addEventListener("click", () => handleRecordAction(button));
+    });
+
+    // Custom Roles Interactions
+    document.getElementById("customRoleForm")?.addEventListener("submit", handleCustomRoleSubmit);
+    document.getElementById("btnCancelRoleEdit")?.addEventListener("click", () => {
+        state.editingRoleId = null;
+        renderShell();
+    });
+    document.querySelectorAll("[data-edit-role]").forEach((button) => {
+        button.addEventListener("click", () => handleEditRoleClick(button.dataset.editRole));
+    });
+    document.querySelectorAll("[data-delete-role]").forEach((button) => {
+        button.addEventListener("click", () => handleDeleteRoleClick(button.dataset.deleteRole));
     });
 }
 
@@ -1551,7 +1630,7 @@ function userTable(users) {
                                 </div>
                             </td>
                             <td class="px-6 py-4 text-xs font-medium text-slate-500">${escapeHtml(companyName(user.companyId))}</td>
-                            <td class="px-6 py-4">${badge(ROLE_DEFINITIONS[user.role]?.label || user.role, "info")}</td>
+                            <td class="px-6 py-4">${badge(getAllRoles()[user.role]?.label || user.role, "info")}</td>
                             <td class="px-6 py-4">${badge(user.status || "active", statusTone(user.status))}</td>
                             <td class="px-6 py-4">${recordActions("users", user.id)}</td>
                         </tr>
@@ -1891,7 +1970,7 @@ function showUserModal() {
             <div class="grid gap-1.5">
                 <label for="inviteRole" class="text-sm font-bold text-slate-700">Role</label>
                 <select id="inviteRole" required class="w-full min-h-[42px] px-3 py-2 bg-white border border-slate-200 rounded-xl text-slate-900 outline-none focus:border-pink-500 focus:ring-4 focus:ring-pink-500/10 transition-all">
-                    ${Object.values(ROLE_DEFINITIONS)
+                    ${Object.values(getAllRoles())
                 .map((role) => `<option value="${role.id}">${role.label}</option>`)
                 .join("")}
                 </select>
@@ -1985,7 +2064,7 @@ function showRoleModal() {
             <div class="grid gap-1.5 mt-2">
                 <label class="text-sm font-bold text-slate-700">Target Role</label>
                 <div class="grid grid-cols-2 gap-3">
-                    ${Object.values(ROLE_DEFINITIONS)
+                    ${Object.values(getAllRoles())
                 .map(
                     (role) => `
                         <label class="relative flex flex-col p-4 rounded-xl border border-slate-200 bg-slate-50/50 cursor-pointer hover:border-pink-300 hover:bg-white hover:shadow-md transition-all has-[:checked]:border-pink-500 has-[:checked]:bg-white has-[:checked]:ring-4 has-[:checked]:ring-pink-500/10">
@@ -2009,4 +2088,75 @@ function showRoleModal() {
             close();
         }
     });
+}
+
+async function handleCustomRoleSubmit(event) {
+    event.preventDefault();
+    const label = document.getElementById("customRoleLabel").value.trim();
+    const permsInputs = document.querySelectorAll('input[name="customRolePerms"]:checked');
+    const permissions = Array.from(permsInputs).map(input => input.value);
+
+    if (!label) {
+        toast("Role label is required.", true);
+        return;
+    }
+
+    try {
+        if (state.editingRoleId) {
+            await updateCustomRole(state.editingRoleId, {
+                label,
+                permissions
+            });
+            state.editingRoleId = null;
+            toast("Role updated successfully.");
+        } else {
+            const roleId = "custom_" + label.toLowerCase().replace(/[^a-z0-9]/g, "_");
+            if (getAllRoles()[roleId]) {
+                toast(`Role ID "${roleId}" is already in use. Please choose a different label.`, true);
+                return;
+            }
+            await createCustomRole("global", {
+                label,
+                permissions
+            });
+            toast("Role created successfully.");
+        }
+        await loadData();
+        renderShell();
+    } catch (error) {
+        console.error(error);
+        toast(error.message, true);
+    }
+}
+
+function handleEditRoleClick(docId) {
+    const role = Object.values(DYNAMIC_ROLES).find(r => r.docId === docId);
+    if (role) {
+        state.editingRoleId = docId;
+        renderShell();
+        
+        // Populate form fields after rendering
+        document.getElementById("customRoleLabel").value = role.label;
+        const perms = role.permissions;
+        document.querySelectorAll('input[name="customRolePerms"]').forEach(checkbox => {
+            checkbox.checked = perms.includes(checkbox.value);
+        });
+    }
+}
+
+async function handleDeleteRoleClick(docId) {
+    if (confirm("Are you sure you want to delete this custom role? Users assigned to this role may lose access permissions.")) {
+        try {
+            await deleteRecord("roles", docId);
+            toast("Role deleted successfully.");
+            if (state.editingRoleId === docId) {
+                state.editingRoleId = null;
+            }
+            await loadData();
+            renderShell();
+        } catch (error) {
+            console.error(error);
+            toast(error.message, true);
+        }
+    }
 }

@@ -1,5 +1,5 @@
 import { PLAN_CATALOG, resolvePlanLimits } from "../config/plans.js";
-import { ROLE_DEFINITIONS } from "../config/rbac.js";
+import { getRole } from "../config/rbac.js";
 import { atomicCreateCompany, createRecord, listByCompany, setRecord, updateRecord } from "./firestoreService.js";
 import { canAddUser } from "./accessControlService.js";
 
@@ -51,7 +51,7 @@ export async function inviteUser({ company, subscription, activeUserCount, userI
 }
 
 export async function assignRole(userId, role) {
-    if (!ROLE_DEFINITIONS[role]) throw new Error("Unknown role.");
+    if (!getRole(role)) throw new Error("Unknown role.");
     await updateRecord("users", userId, { role });
 }
 
