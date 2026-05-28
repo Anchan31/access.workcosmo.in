@@ -701,7 +701,6 @@ function renderRoles() {
         </div>
     `;
 }
-}
 
 function renderSubscriptions() {
     return `
