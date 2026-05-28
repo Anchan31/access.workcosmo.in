@@ -187,15 +187,15 @@ function renderShell() {
                 </div>
                 <nav class="grid gap-2">
                     ${Object.entries(views)
-                        .map(
-                            ([key, view]) => `
+            .map(
+                ([key, view]) => `
                         <button class="w-full flex items-center gap-3 px-4 py-3 rounded-xl font-bold transition-all ${key === state.view ? "text-blue-600 bg-blue-50 shadow-sm shadow-blue-100" : "text-slate-500 hover:text-slate-900 hover:bg-white"}" data-view="${key}">
                             <i class="fas ${view.icon}"></i>
                             <span>${view.label}</span>
                         </button>
                     `
-                        )
-                        .join("")}
+            )
+            .join("")}
                 </nav>
                 <div class="mt-auto p-4 bg-white rounded-xl border border-slate-200 shadow-sm">
                     <div class="flex items-center gap-3 mb-3">
@@ -414,15 +414,6 @@ function renderCompanies() {
     return `
         <div class="grid grid-cols-1 lg:grid-cols-[380px_1fr] gap-8 items-start">
             <div class="bg-white/90 backdrop-blur-lg border border-slate-200 rounded-2xl p-6 shadow-lg shadow-slate-200/40">
-                <div class="flex justify-between items-start mb-4">
-                    <div>
-                        <h3 class="text-lg font-black text-slate-800 mb-2">Create Company Workspace</h3>
-                        <p class="text-slate-500 text-sm font-medium mb-6">Creates the customer workspace and first login profile after you create the Firebase Auth user.</p>
-                    </div>
-                    <!-- Action available in header; removed duplicate card CTA -->
-                </div>
-            </div>
-            <div class="bg-white/90 backdrop-blur-lg border border-slate-200 rounded-2xl p-6 shadow-lg shadow-slate-200/40">
                 <div class="flex justify-between items-start gap-4 mb-4">
                     <div>
                         <h3 class="text-lg font-black text-slate-800">Managed Companies</h3>
@@ -487,19 +478,19 @@ function renderRoles() {
                         </thead>
                         <tbody class="divide-y divide-slate-100">
                             ${permissions
-                                .map(
-                                    (perm) => `
+            .map(
+                (perm) => `
                                 <tr class="hover:bg-slate-50 transition-colors">
                                     <td class="px-6 py-4">
                                         <div class="font-bold text-slate-800">${perm.replace(/_/g, " ")}</div>
                                         <div class="text-[10px] text-slate-500 font-medium uppercase">Capability</div>
                                     </td>
                                     ${roles
-                                        .map((role) => {
-                                            const has =
-                                                role.permissions.includes(perm) ||
-                                                role.permissions.includes("full_access");
-                                            return `
+                        .map((role) => {
+                            const has =
+                                role.permissions.includes(perm) ||
+                                role.permissions.includes("full_access");
+                            return `
                                             <td class="px-6 py-4 text-center">
                                                 <div class="flex justify-center">
                                                     <div class="w-6 h-6 rounded-md flex items-center justify-center ${has ? "bg-emerald-100 text-emerald-600" : "bg-slate-100 text-slate-700"}">
@@ -508,12 +499,12 @@ function renderRoles() {
                                                 </div>
                                             </td>
                                         `;
-                                        })
-                                        .join("")}
+                        })
+                        .join("")}
                                 </tr>
                             `
-                                )
-                                .join("")}
+            )
+            .join("")}
                         </tbody>
                     </table>
                 </div>
@@ -539,16 +530,16 @@ function renderRoles() {
                                 <label class="text-xs font-bold text-slate-500 uppercase tracking-widest">Target Role</label>
                                 <div class="grid grid-cols-2 gap-3">
                                     ${roles
-                                        .map(
-                                            (role) => `
+            .map(
+                (role) => `
                                         <label class="relative flex flex-col p-4 rounded-xl border border-slate-200 bg-slate-100/50 cursor-pointer hover:bg-white/10 transition-all">
                                             <input type="radio" name="roleValue" value="${role.id}" class="sr-only" required>
                                             <span class="text-sm font-bold text-slate-800">${role.label}</span>
                                             <span class="text-[10px] text-slate-500 font-medium">${role.permissions.length} perms</span>
                                         </label>
                                     `
-                                        )
-                                        .join("")}
+            )
+            .join("")}
                                 </div>
                             </div>
                             <button class="btn btn-primary w-full shimmer" type="submit">
@@ -652,8 +643,8 @@ function emailTable(emails) {
                 </thead>
                 <tbody class="divide-y divide-slate-100">
                     ${emails
-                        .map(
-                            (email) => `
+            .map(
+                (email) => `
                                 <tr class="hover:bg-slate-50 transition-colors">
                                     <td class="px-6 py-4">
                                         <div class="font-bold text-slate-800">${escapeHtml(email.emailAddress)}</div>
@@ -671,8 +662,8 @@ function emailTable(emails) {
                                     <td class="px-6 py-4">${recordActions("emails", email.id)}</td>
                                 </tr>
                             `
-                        )
-                        .join("")}
+            )
+            .join("")}
                 </tbody>
             </table>
         </div>
@@ -722,8 +713,8 @@ function renderModules() {
                 </div>
                 <div class="grid three">
                     ${Object.values(FEATURES)
-                        .map(
-                            (feature) => `
+            .map(
+                (feature) => `
                         <div class="panel">
                             <h3>${feature.label}</h3>
                             <p class="muted">${feature.description}</p>
@@ -731,21 +722,21 @@ function renderModules() {
                             ${badge(canAccessModule(user, company, subscription, feature.key) ? "Role allowed" : "Role blocked", canAccessModule(user, company, subscription, feature.key) ? "success" : "warning")}
                         </div>
                     `
-                        )
-                        .join("")}
+            )
+            .join("")}
                 </div>
             </section>
             <section class="panel">
                 <h3>Permission Probe</h3>
                 <p class="muted">Active user: ${escapeHtml(user?.name || "Unknown")} - role: ${escapeHtml(user?.role || "none")}</p>
                 <div>${Object.values(PERMISSIONS)
-                    .map((permission) =>
-                        badge(
-                            `${permission}: ${hasPermission(user, permission) ? "yes" : "no"}`,
-                            hasPermission(user, permission) ? "success" : "soft"
-                        )
-                    )
-                    .join("")}</div>
+            .map((permission) =>
+                badge(
+                    `${permission}: ${hasPermission(user, permission) ? "yes" : "no"}`,
+                    hasPermission(user, permission) ? "success" : "soft"
+                )
+            )
+            .join("")}</div>
             </section>
         </div>
     `;
@@ -1327,9 +1318,9 @@ function purchaseRequestTable(requests, compact = false) {
                 </thead>
                 <tbody class="divide-y divide-slate-100">
                     ${requests
-                        .map((request) => {
-                            const completed = request.provisioningStatus === "completed";
-                            return `
+            .map((request) => {
+                const completed = request.provisioningStatus === "completed";
+                return `
                             <tr class="hover:bg-slate-50 transition-colors">
                                 <td class="px-6 py-4">
                                     <div class="font-bold text-slate-800">${escapeHtml(request.companyName || request.buyerName || "Unknown buyer")}</div>
@@ -1344,21 +1335,20 @@ function purchaseRequestTable(requests, compact = false) {
                                     <div class="text-[10px] text-slate-500 mt-1">${formatDateTime(request.updatedAt || request.createdAt)}</div>
                                 </td>
                                 <td class="px-6 py-4">${badge(request.provisioningStatus || "idle", completed ? "success" : "warning")}</td>
-                                ${
-                                    compact
-                                        ? ""
-                                        : `
+                                ${compact
+                        ? ""
+                        : `
                                     <td class="px-6 py-4">
                                         <button class="px-4 py-2 rounded-xl bg-blue-600 text-slate-900 text-xs font-bold shadow-lg shadow-blue-500/20 hover:scale-105 transition-all disabled:opacity-50 disabled:scale-100" data-provision-request="${request.id}" ${completed ? "disabled" : ""}>
                                             Activate
                                         </button>
                                     </td>
                                 `
-                                }
+                    }
                             </tr>
                         `;
-                        })
-                        .join("")}
+            })
+            .join("")}
                 </tbody>
             </table>
         </div>
@@ -1381,9 +1371,9 @@ function companyTable(companies) {
                 </thead>
                 <tbody class="divide-y divide-slate-100">
                     ${companies
-                        .map((company) => {
-                            const used = userCount(company.id);
-                            return `
+            .map((company) => {
+                const used = userCount(company.id);
+                return `
                             <tr class="hover:bg-slate-50 transition-colors">
                                 <td class="px-6 py-4">
                                     <div class="font-bold text-slate-800">${escapeHtml(company.companyName)}</div>
@@ -1403,8 +1393,8 @@ function companyTable(companies) {
                                 <td class="px-6 py-4">${recordActions("companies", company.id)}</td>
                             </tr>
                         `;
-                        })
-                        .join("")}
+            })
+            .join("")}
                 </tbody>
             </table>
         </div>
@@ -1427,8 +1417,8 @@ function userTable(users) {
                 </thead>
                 <tbody class="divide-y divide-slate-100">
                     ${users
-                        .map(
-                            (user) => `
+            .map(
+                (user) => `
                         <tr class="hover:bg-slate-50 transition-colors">
                             <td class="px-6 py-4">
                                 <div class="font-bold text-slate-800">${escapeHtml(user.name)}</div>
@@ -1440,8 +1430,8 @@ function userTable(users) {
                             <td class="px-6 py-4">${recordActions("users", user.id)}</td>
                         </tr>
                     `
-                        )
-                        .join("")}
+            )
+            .join("")}
                 </tbody>
             </table>
         </div>
@@ -1463,8 +1453,8 @@ function subscriptionTable(subscriptions) {
                 </thead>
                 <tbody class="divide-y divide-slate-100">
                     ${subscriptions
-                        .map(
-                            (sub) => `
+            .map(
+                (sub) => `
                         <tr class="hover:bg-slate-50 transition-colors">
                             <td class="px-6 py-4">
                                 <div class="font-bold text-slate-800">${escapeHtml(sub.customerName)}</div>
@@ -1489,8 +1479,8 @@ function subscriptionTable(subscriptions) {
                             </td>
                         </tr>
                     `
-                        )
-                        .join("")}
+            )
+            .join("")}
                 </tbody>
             </table>
         </div>
@@ -1532,8 +1522,8 @@ function companyUsageList() {
                 p > 90
                     ? "from-rose-500 to-pink-500"
                     : p > 70
-                      ? "from-amber-400 to-orange-500"
-                      : "from-blue-500 to-indigo-500";
+                        ? "from-amber-400 to-orange-500"
+                        : "from-blue-500 to-indigo-500";
             return `
             <div class="p-4 rounded-2xl bg-white border border-slate-100 hover:shadow-md hover:border-slate-200 transition-all">
                 <div class="flex justify-between items-center mb-3">
@@ -1707,7 +1697,7 @@ function showCompanyModal() {
                 <input id="ownerEmail" type="email" required class="w-full min-h-[42px] px-3 py-2 bg-white border border-slate-200 rounded-xl text-slate-900 outline-none focus:border-pink-500 focus:ring-4 focus:ring-pink-500/10 transition-all">
             </div>
         `,
-            onSubmit: async (e, form, close) => {
+        onSubmit: async (e, form, close) => {
             const sel = document.getElementById("companySubscription").value;
             let subscription = null;
             if (sel) subscription = await getRecord("subscriptions", sel);
@@ -1776,8 +1766,8 @@ function showUserModal() {
                 <label for="inviteRole" class="text-sm font-bold text-slate-700">Role</label>
                 <select id="inviteRole" required class="w-full min-h-[42px] px-3 py-2 bg-white border border-slate-200 rounded-xl text-slate-900 outline-none focus:border-pink-500 focus:ring-4 focus:ring-pink-500/10 transition-all">
                     ${Object.values(ROLE_DEFINITIONS)
-                        .map((role) => `<option value="${role.id}">${role.label}</option>`)
-                        .join("")}
+                .map((role) => `<option value="${role.id}">${role.label}</option>`)
+                .join("")}
                 </select>
             </div>
         `,
@@ -1819,8 +1809,8 @@ function showSubscriptionModal() {
                 <label for="plan" class="text-sm font-bold text-slate-700">Plan</label>
                 <select id="plan" required class="w-full min-h-[42px] px-3 py-2 bg-white border border-slate-200 rounded-xl text-slate-900 outline-none focus:border-pink-500 focus:ring-4 focus:ring-pink-500/10 transition-all">
                     ${Object.values(PLAN_CATALOG)
-                        .map((plan) => `<option value="${plan.id}">${plan.name}</option>`)
-                        .join("")}
+                .map((plan) => `<option value="${plan.id}">${plan.name}</option>`)
+                .join("")}
                 </select>
             </div>
             <div class="grid gap-1.5"><label for="customMaxUsers" class="text-sm font-bold text-slate-700">Custom Max Users</label><input id="customMaxUsers" type="number" min="1" placeholder="Only for Custom" class="w-full min-h-[42px] px-3 py-2 bg-white border border-slate-200 rounded-xl text-slate-900 outline-none focus:border-pink-500 focus:ring-4 focus:ring-pink-500/10 transition-all"></div>
@@ -1870,16 +1860,16 @@ function showRoleModal() {
                 <label class="text-sm font-bold text-slate-700">Target Role</label>
                 <div class="grid grid-cols-2 gap-3">
                     ${Object.values(ROLE_DEFINITIONS)
-                        .map(
-                            (role) => `
+                .map(
+                    (role) => `
                         <label class="relative flex flex-col p-4 rounded-xl border border-slate-200 bg-white cursor-pointer hover:border-pink-300 hover:shadow-md transition-all">
                             <input type="radio" name="roleValue" value="${role.id}" class="sr-only" required>
                             <span class="text-sm font-bold text-slate-800">${role.label}</span>
                             <span class="text-[10px] text-slate-500 font-medium">${role.permissions.length} perms</span>
                         </label>
                     `
-                        )
-                        .join("")}
+                )
+                .join("")}
                 </div>
             </div>
         `,
