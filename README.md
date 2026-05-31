@@ -1,18 +1,18 @@
-# NextGen Udaan Access Control
+# Work Cosmo Access Control
 
-Private owner-operated access panel for the NextGen Udaan Recruitment Management SaaS platform.
+Private owner-operated access panel for the Work Cosmo Recruitment Management SaaS platform.
 
 This is not a customer self-service subscription portal. Customers contact you. You create and control everything, then provide only:
 
-- RMS portal link: `https://app.nextgenudaan.in`
+- RMS portal link: `https://app.workcosmo.in`
 - Email
 - Password
 
 ## Domains
 
-- `nextgenudaan.in`: public information and contact.
-- `access.nextgenudaan.in`: private owner-only control panel.
-- `app.nextgenudaan.in`: customer RMS login.
+- `workcosmo.in`: public information and contact.
+- `access.workcosmo.in`: private owner-only control panel.
+- `app.workcosmo.in`: customer RMS login.
 
 ## Owner Workflow
 
@@ -68,7 +68,7 @@ To unlock the owner panel, create your Firebase Auth account and add:
 
 ```json
 {
-  "name": "NextGen Udaan Owner",
+  "name": "Work Cosmo Owner",
   "email": "your-email@example.com",
   "status": "active"
 }
@@ -88,7 +88,7 @@ For every customer user:
 2. Set their password.
 3. Copy their Firebase Auth UID.
 4. In this panel, create a user profile with that UID.
-5. Send the customer `https://app.nextgenudaan.in`, email, and password.
+5. Send the customer `https://app.workcosmo.in`, email, and password.
 
 ## Deploy
 
@@ -97,7 +97,7 @@ npm run build
 firebase deploy --only hosting,firestore:rules,firestore:indexes
 ```
 
-Map Firebase Hosting to `access.nextgenudaan.in`.
+Map Firebase Hosting to `access.workcosmo.in`.
 
 ## Razorpay Webhook Sync
 

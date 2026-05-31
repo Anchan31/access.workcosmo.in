@@ -194,7 +194,7 @@ function renderShell() {
                 <div class="flex items-center gap-3">
                     <div class="w-10 h-10 bg-gradient-to-br from-blue-500 to-pink-500 rounded-xl flex items-center justify-center text-slate-900 text-lg shadow-md"><i class="fas fa-shield-halved"></i></div>
                     <div>
-                        <span class="block text-[17px] font-black text-slate-900">NextGen Udaan</span>
+                        <span class="block text-[17px] font-black text-slate-900">Work Cosmo</span>
                         <span class="text-xs text-slate-500 font-medium">Control Center</span>
                     </div>
                 </div>
@@ -256,7 +256,7 @@ function renderLogin(error = "") {
                 <i class="fas fa-shield-halved"></i>
             </div>
             <div class="text-center">
-                <h1 class="text-2xl font-black text-slate-900 mb-2">NextGen Access</h1>
+                <h1 class="text-2xl font-black text-slate-900 mb-2">Work Cosmo Access</h1>
                 <p class="text-sm font-medium text-slate-500">Private owner login portal.</p>
             </div>
             ${error ? `<div class="px-3 py-2 rounded-lg bg-red-50 text-red-600 text-sm font-bold border border-red-100 text-center">${escapeHtml(error)}</div>` : ""}
@@ -290,7 +290,7 @@ function renderExpired() {
         <div class="bg-white/90 backdrop-blur-lg border border-slate-200 rounded-2xl p-8 shadow-2xl shadow-slate-200 max-w-md w-full text-center">
             <p class="text-xs font-black tracking-widest uppercase text-pink-500 mb-2">${state.session.ownerOnly ? "Owner access required" : "Subscription required"}</p>
             <h1 class="text-2xl font-black text-slate-900 mb-4">${state.session.ownerOnly ? "This account is not an admin" : "Access is paused"}</h1>
-            <p class="text-slate-500 text-sm mb-6">${escapeHtml(state.session.blockedReason || "Subscription inactive. Contact NextGen Udaan to restore access.")}</p>
+            <p class="text-slate-500 text-sm mb-6">${escapeHtml(state.session.blockedReason || "Subscription inactive. Contact Work Cosmo to restore access.")}</p>
             ${state.session.ownerOnly ? `<p class="text-slate-500 text-sm mb-6">Create that Firestore document once, then refresh and sign in again.</p>` : ""}
             <div class="flex justify-center gap-3 flex-wrap">
                 <button class="inline-flex items-center justify-center gap-2 px-4 py-2 font-bold rounded-xl bg-gradient-to-r from-blue-600 to-pink-500 text-slate-900 hover:scale-[1.02] transition-all" id="billingRetry"><i class="fas fa-copy"></i> Copy UID</button>
@@ -553,7 +553,7 @@ function renderRoles() {
                 <div class="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
                     <div>
                         <h3 class="text-lg font-black text-slate-800">Ecosystem Permission Matrix</h3>
-                        <p class="text-xs text-slate-500 font-medium">Cross-role capability mapping for the Nextgen Access & SaaS Suites</p>
+                        <p class="text-xs text-slate-500 font-medium">Cross-role capability mapping for the Work Cosmo Access & SaaS Suites</p>
                     </div>
                     <div class="flex gap-2">
                         ${roles.map((r) => badge(r.label, "info")).join("")}
@@ -907,7 +907,7 @@ function renderArchitecture() {
                 <div>
                     <p class="eyebrow">Login access flow</p>
                     <h2>Payment request first, owner activation second.</h2>
-                    <p class="muted">Buyers pay on the public site. You confirm payment here, then customers use <code>app.nextgenudaan.in</code> after their access pass is active.</p>
+                    <p class="muted">Buyers pay on the public site. You confirm payment here, then customers use <code>app.workcosmo.in</code> after their access pass is active.</p>
                 </div>
                 <div class="domain-strip">
                     ${domainItem("1. Firebase Auth", "Verify signed-in user")}
@@ -1162,7 +1162,7 @@ async function handleProvisionRequest(requestId) {
     const suggestedSlug = getClientId(request.companyName);
     const companySlug = getClientId(
         prompt(
-            "Confirm Client ID / Subdomain for this Company:\n(e.g., entering 'brawn' will create brawn.nextgenudaan.in/app)",
+            "Confirm Client ID / Subdomain for this Company:\n(e.g., entering 'brawn' will create brawn.workcosmo.in/app)",
             suggestedSlug
         )
     );
@@ -1172,7 +1172,7 @@ async function handleProvisionRequest(requestId) {
     }
 
     // 2. Register Firebase Auth Account using Secondary Auth
-    const tempPassword = "NextGen@2026!";
+    const tempPassword = "WorkCosmo@2026!";
     let firebaseUser;
     try {
         toast("Creating secure login credentials...", false);
@@ -1230,7 +1230,7 @@ async function handleProvisionRequest(requestId) {
         planName: planName(request.plan),
         maxUsers: resolvePlanLimits(subscription).maxUsers,
         features: resolvePlanLimits(subscription).features,
-        appUrl: `https://${companySlug}.nextgenudaan.in/app`,
+        appUrl: `https://${companySlug}.workcosmo.in/app`,
         status: "active",
         activatedAt: new Date().toISOString(),
         activatedBy: state.session.user?.email || "owner"
@@ -1240,7 +1240,7 @@ async function handleProvisionRequest(requestId) {
     renderShell();
 
     // 6. Copy details to clipboard and show immersive alert
-    const credentialsText = `Workspace Subdomain: ${companySlug}.nextgenudaan.in/app\nAdmin Email: ${request.buyerEmail}\nDefault Password: ${tempPassword}`;
+    const credentialsText = `Workspace Subdomain: ${companySlug}.workcosmo.in/app\nAdmin Email: ${request.buyerEmail}\nDefault Password: ${tempPassword}`;
     navigator.clipboard?.writeText(credentialsText);
     alert(
         `🎉 Workspace Provisioned Successfully!\n\nCredentials have been COPIED to your clipboard:\n\n${credentialsText}\n\nYou can now paste this directly into an email to your client.`
@@ -1908,7 +1908,7 @@ function primaryActionLabel() {
     return "New Record";
 }
 
-window.NextGenAccess = {
+window.WorkCosmoAccess = {
     hasPermission,
     hasFeature,
     canAddUser,

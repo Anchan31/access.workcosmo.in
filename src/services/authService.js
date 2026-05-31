@@ -6,7 +6,7 @@ import {
 import { auth } from "./firebase.js";
 import { getRecord, setRecord } from "./firestoreService.js";
 
-const OWNER_EMAILS = ["nextgenudaan@gmail.com", "it.nextgenudaan@gmail.com"];
+const OWNER_EMAILS = ["workcosmo.in@gmail.com", "it.workcosmo.in@gmail.com"];
 const OWNER_EMAIL_LABEL = OWNER_EMAILS.join(" or ");
 
 export function watchAuth(callback) {
@@ -51,7 +51,7 @@ export async function loadAccessSession(firebaseUser) {
     if (OWNER_EMAILS.includes(email)) {
         try {
             await setRecord("platformAdmins", firebaseUser.uid, {
-                name: email === "it.nextgenudaan@gmail.com" ? "NextGen Udaan IT Admin" : "NextGen Udaan Owner",
+                name: email === "it.workcosmo.in@gmail.com" ? "Work Cosmo IT Admin" : "Work Cosmo Owner",
                 email,
                 role: "owner",
                 status: "active",
