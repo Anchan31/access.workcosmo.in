@@ -925,7 +925,7 @@ function renderArchitecture() {
                         ${domainItem("/platformAdmins/{uid}", "owner-only admin access for this panel")}
                         ${domainItem("/purchaseRequests/{id}", "buyer, company, Razorpay ids, payment and provisioning status")}
                         ${domainItem("/accessPasses/{id}", "final company, plan, modules, owner, and app login handoff")}
-                        ${domainItem("/companies/{companyId}", "companyName, ownerId, subscriptionId, plan, maxUsers, status, features")}
+                        ${domainItem("/companies/{companyId}", "companyName, ownerId, subscriptionId, plan, maxUsers, status, features, modulesEnabled")}
                         ${domainItem("/users/{userId}", "companyId, name, email, role, status, inviteStatus")}
                         ${domainItem("/subscriptions/{subscriptionId}", "plan, maxUsers, status, dates, Razorpay ids, custom limits")}
                         ${domainItem("/roles/{roleId}", "companyId, label, permissions, status")}
@@ -1230,7 +1230,8 @@ async function handleProvisionRequest(requestId) {
         planName: planName(request.plan),
         maxUsers: resolvePlanLimits(subscription).maxUsers,
         features: resolvePlanLimits(subscription).features,
-        appUrl: `https://${companySlug}.workcosmo.in/app`,
+        appUrl: `https://space.workcosmo.in`,
+        hireUrl: `https://hire.workcosmo.in/${companySlug}`,
         status: "active",
         activatedAt: new Date().toISOString(),
         activatedBy: state.session.user?.email || "owner"
@@ -1240,7 +1241,7 @@ async function handleProvisionRequest(requestId) {
     renderShell();
 
     // 6. Copy details to clipboard and show immersive alert
-    const credentialsText = `Workspace Subdomain: ${companySlug}.workcosmo.in/app\nAdmin Email: ${request.buyerEmail}\nDefault Password: ${tempPassword}`;
+    const credentialsText = `Space URL: https://space.workcosmo.in\nClient ID: ${companySlug}\nHire URL: https://hire.workcosmo.in/${companySlug}\nAdmin Email: ${request.buyerEmail}\nDefault Password: ${tempPassword}`;
     navigator.clipboard?.writeText(credentialsText);
     alert(
         `🎉 Workspace Provisioned Successfully!\n\nCredentials have been COPIED to your clipboard:\n\n${credentialsText}\n\nYou can now paste this directly into an email to your client.`

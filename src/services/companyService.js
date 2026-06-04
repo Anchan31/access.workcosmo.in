@@ -21,6 +21,13 @@ export async function createCompanyWorkspace(subscription, input) {
             aiCreditsRemaining: Number(subscription.aiCreditsRemaining || subscription.aiCreditsIncluded || 0),
             status: "active",
             features: limits.features,
+            modulesEnabled: {
+                hire: true,
+                learn: false,
+                core: false,
+                perform: false,
+                ai: false
+            },
             customLimits: subscription.customLimits || {}
         },
         owner: {
