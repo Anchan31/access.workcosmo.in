@@ -160,6 +160,13 @@ async function loadData() {
         permissions,
         emails
     };
+    console.log("ALL FIREBASE USERS IN FIRESTORE:", users);
+    const chandan = users.find((u) => u.email && u.email.toLowerCase().includes("chandan"));
+    if (chandan) {
+        console.log("FOUND CHANDAN USER DOCUMENT IN FIRESTORE:", JSON.stringify(chandan, null, 2));
+    } else {
+        console.log("CHANDAN USER DOCUMENT NOT FOUND IN FIRESTORE!");
+    }
     registerDynamicRoles(roles);
 }
 
