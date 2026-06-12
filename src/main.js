@@ -160,6 +160,25 @@ async function loadData() {
         permissions,
         emails
     };
+    
+    // Add utility to window to fix misaligned user IDs
+    window.fixMisalignedUsers = async () => {
+        let fixedCount = 0;
+        for (const u of state.users) {
+            if (u.id && u.userId && u.id !== u.userId) {
+                console.log(`Fixing misaligned user: ${u.email} (Old ID: ${u.id}, New ID: ${u.userId})`);
+                await setRecord("users", u.userId, { ...u });
+                await deleteRecord("users", u.id);
+                fixedCount++;
+            }
+        }
+        if (fixedCount > 0) {
+            alert(`Fixed ${fixedCount} misaligned users! Please refresh the page.`);
+        } else {
+            alert("No misaligned users found.");
+        }
+    };
+    
     console.log("ALL FIREBASE USERS IN FIRESTORE:", users);
     const chandan = users.find((u) => u.email && u.email.toLowerCase().includes("chandan"));
     if (chandan) {
