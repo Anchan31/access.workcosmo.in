@@ -15,6 +15,7 @@ import {
     getRecord,
     updateRecord,
     deleteRecord,
+    setRecord,
     listByCompany
 } from "./services/firestoreService.js";
 import {
